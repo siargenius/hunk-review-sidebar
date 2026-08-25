@@ -27,12 +27,13 @@ hunk diff --extension /path/to/checkout/mark-as-reviewed.tsx
 | --- | --- | --- |
 | `x` | `mark-as-reviewed.toggleHunk` | Toggle the current hunk reviewed/unreviewed |
 | `X` | `mark-as-reviewed.toggleFile` | Toggle every hunk in the current file (binary/skipped files toggle as a whole) |
-| — | `mark-as-reviewed.nextUnreviewed` | Jump to the next unreviewed hunk, across files, wrapping |
-| — | `mark-as-reviewed.prevUnreviewed` | Jump to the previous unreviewed hunk |
+| `>` | `mark-as-reviewed.nextUnreviewed` | Jump to the next unreviewed hunk, across files, wrapping |
+| `<` | `mark-as-reviewed.prevUnreviewed` | Jump to the previous unreviewed hunk |
 | — | `mark-as-reviewed.toggleHideReviewed` | Hide fully-reviewed files from the review |
 | — | `mark-as-reviewed.resetReview` | Clear every reviewed mark |
 
-Unbound commands live in the **Extensions** menu and can be bound in
+`>`/`<` are the shifted forms of Hunk's own `.`/`,` (next/previous file), so
+the mnemonic composes. Every command is rebindable in
 `~/.config/hunk/config.toml`:
 
 ```toml

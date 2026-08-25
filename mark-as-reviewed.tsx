@@ -114,11 +114,11 @@ export default function (hunk: HunkExtensionAPI) {
     };
 
   hunk.registerCommand(
-    { id: "nextUnreviewed", title: "Next unreviewed hunk" },
+    { id: "nextUnreviewed", title: "Next unreviewed hunk", key: ">" },
     goUnreviewed(1),
   );
   hunk.registerCommand(
-    { id: "prevUnreviewed", title: "Previous unreviewed hunk" },
+    { id: "prevUnreviewed", title: "Previous unreviewed hunk", key: "<" },
     goUnreviewed(-1),
   );
 

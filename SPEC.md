@@ -87,8 +87,8 @@ name).
 | --- | --- | --- |
 | `mark-as-reviewed.toggleHunk` | Toggle hunk reviewed | `x` |
 | `mark-as-reviewed.toggleFile` | Toggle file reviewed | `X` |
-| `mark-as-reviewed.nextUnreviewed` | Next unreviewed hunk | *(none)* |
-| `mark-as-reviewed.prevUnreviewed` | Previous unreviewed hunk | *(none)* |
+| `mark-as-reviewed.nextUnreviewed` | Next unreviewed hunk | `>` |
+| `mark-as-reviewed.prevUnreviewed` | Previous unreviewed hunk | `<` |
 | `mark-as-reviewed.toggleHideReviewed` | Hide reviewed files | *(none)* |
 | `mark-as-reviewed.resetReview` | Clear all reviewed marks | *(none)* |
 
