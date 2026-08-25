@@ -1,0 +1,23 @@
+{
+  "name": "hunk-mark-as-reviewed",
+  "version": "0.1.0",
+  "description": "Hunk extension: mark hunks and files as reviewed, track progress in the file list, and hide what you've finished.",
+  "license": "MIT",
+  "type": "module",
+  "hunk": {
+    "apiVersion": 8
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "node --test \"test/*.test.ts\""
+  },
+  "devDependencies": {
+    "@opentui/core": "*",
+    "@opentui/react": "*",
+    "@types/node": "^26.3.0",
+    "@types/react": "*",
+    "hunkdiff": "*",
+    "react": "*",
+    "typescript": "*"
+  }
+}
