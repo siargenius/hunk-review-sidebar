@@ -57,15 +57,16 @@ and rebind:
 
 ## What you see
 
-- **File tree** (swaps in for the built-in files pane once you start
-  marking): every file expands into its hunks. File rows keep their
-  `+adds/-dels` badges and add a review badge — `(2/7)` while a file is in
-  progress, `☑` when every hunk is reviewed, `✓` for hunk-less files marked
-  whole. Hunk rows show the `@@` header and turn muted with a `✓` once
-  reviewed. A summary line at the top counts the whole changeset and flags
-  when reviewed files are being hidden. Until the first hunk is marked — and
-  again if every mark is cleared — the plain built-in file list keeps the
-  slot, so the tree only appears when there's progress to track.
+- **Review pane** (a file/hunk tree that swaps places with the built-in
+  file list once you start marking): every file expands into its hunks. File
+  rows keep their `+adds/-dels` badges and add a review badge — `(2/7)`
+  while a file is in progress, `☑` when every hunk is reviewed, `✓` for
+  hunk-less files marked whole. Hunk rows show the `@@` header and turn muted
+  with a `✓` once reviewed. A summary line at the top counts the whole
+  changeset and flags when reviewed files are being hidden. Until the first
+  hunk is marked — and again once every mark is cleared — only the plain
+  built-in file list is around, and `s` / View → Files toggles it alone; the
+  tree's visibility is driven purely by your marks.
 - **Click to jump, `x` to mark**: clicking a file or hunk row jumps the
   review stream to it, so the usual `x`/`X` toggles then mark exactly what
   you clicked.

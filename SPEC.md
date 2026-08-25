@@ -15,7 +15,7 @@ Target API: `hunkdiff/extension` **apiVersion 8** (Hunk ≥ 0.19).
 | 1 | `r` toggles current hunk reviewed/unreviewed | `hunk.registerCommand` + `ctx.selection` |
 | 2 | `R` toggles all hunks in current file | `hunk.registerCommand` + `ctx.selection` |
 | 3 | Next / Previous Unreviewed Hunk commands (bindable, no default key) | `hunk.registerCommand` (no `key`) + `ctx.navigation.selectHunk` / `selectFile` |
-| 4 | File tree shows `(n/total)` per file (`☑` when complete) and per-hunk `✓` rows that jump on click | `hunk.registerPane` with `replaces: "hunk:files"` + `props.actions.selectHunk` |
+| 4 | Review pane (file tree) shows `(n/total)` per file (`☑` when complete) and per-hunk `✓` rows that jump on click; visible only while marks exist | `hunk.registerPane` (standalone pane) + `ctx.panes` open/close + `props.actions.selectHunk` |
 | 5 | Reviewed hunks get a visual style in the diff | MVP: `hunk.registerLineHighlighter`. Stretch: `hunk.registerFileView` (true dimming) |
 | 6 | View option: Hide Reviewed Files (and later Hunks) | Toggle command + `hunk.transformChangeset` + `ctx.commands.execute("hunk.app.refresh")` |
 
@@ -120,10 +120,17 @@ Behavior details:
 
 ---
 
-## 4. File list pane (progress badges)
+## 4. Review pane (progress tree)
 
-A pane registered with `replaces: "hunk:files"` so it takes over the file
-list slot — `s` / View → Files pane keep working against our pane.
+A standalone pane (id `review`, **not** `replaces: "hunk:files"`) — the
+host's files-slot toggle falls back to the replacement key whenever nothing
+is open, so a replacement stays reachable via `s` even with zero marks. As a
+standalone pane, `s` / View → Files only ever toggles the built-in list, and
+the tree's visibility is purely mark-driven: the first mark opens it (and
+closes `hunk:files` so the two never compete for sidebar width); zero marks
+closes it and restores the built-in. Synced after every mutation
+(`toggleHunk`, `toggleFile`, `resetReview`) and on `changeset_loaded`, which
+also restores the tree after a soft reload since marks survive it.
 
 Row rendering — **file/hunk tree**, keeping the built-in's `+adds/-dels`
 stat badges and appending the review badge, with one clickable sub-row per
@@ -144,15 +151,6 @@ file/hunk row follows `props.selectedFileId` / `props.selectedHunkIndex`
 `· hiding reviewed files` while `hideReviewedFiles` is active — command
 titles are frozen at registration (§1.3), so the pane is the surface that
 carries the toggle's state.
-
-**The tree only appears once there is progress to track.** A replacement
-pane claims the `hunk:files` slot whenever it is open, so the swap is plain
-open/close through `ctx.panes`: with zero marks the built-in file list keeps
-the slot (`close` ours, `open("hunk:files")`); the first mark opens ours
-(which also reveals a hidden sidebar — the open is never silent). Synced
-after every mutation (`toggleHunk`, `toggleFile`, `resetReview`) and on
-`changeset_loaded`, which also restores the tree after a soft reload since
-marks survive it.
 
 - Stat badges mirror the built-in pane (`+${additions} -${deletions}` in
   the theme's add/remove colors, honoring `statsTruncated`).

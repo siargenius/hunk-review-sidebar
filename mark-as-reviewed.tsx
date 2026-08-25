@@ -20,16 +20,18 @@ const TONES: readonly ExtensionLineHighlightTone[] = [
 const HIGHLIGHTER_ID = "reviewed";
 
 /**
- * Keep the file-tree pane out of the way until there is progress to track.
- * Our pane replaces the `hunk:files` slot whenever it is open, so the swap is
- * just open/close: the first mark opens ours (revealing a hidden sidebar
- * too), and returning to zero marks hands the slot back to the built-in.
+ * Keep the review tree out of the way until there is progress to track. The
+ * first mark opens it (closing the built-in file list so the two never
+ * compete for sidebar width, and revealing a hidden sidebar); returning to
+ * zero marks closes it and restores the built-in. `s` / View → Files only
+ * ever toggles the built-in list — the tree's visibility is mark-driven only.
  */
 function syncFilesPane(panes: ExtensionPaneControls): void {
   if (store.getState().reviewed.size > 0) {
-    panes.open("files");
+    panes.close("hunk:files");
+    panes.open("review");
   } else {
-    panes.close("files");
+    panes.close("review");
     panes.open("hunk:files");
   }
 }
@@ -177,10 +179,14 @@ export default function (hunk: HunkExtensionAPI) {
 
   // --- Presentation ----------------------------------------------------------
 
+  // A standalone pane, deliberately NOT `replaces: "hunk:files"`: the host's
+  // files-slot toggle falls back to the replacement key whenever nothing is
+  // open, so a replacement stays reachable via `s` even with zero marks. As
+  // our own pane, `s` never touches us — visibility is purely mark-driven
+  // through syncFilesPane.
   hunk.registerPane({
-    id: "files",
-    title: "Files",
-    replaces: "hunk:files",
+    id: "review",
+    title: "Review",
     component: ReviewedFilesPane,
   });
 
