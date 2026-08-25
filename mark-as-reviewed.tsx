@@ -2,6 +2,7 @@ import type {
   ExtensionCommandContext,
   ExtensionDiffFile,
   ExtensionLineHighlightTone,
+  ExtensionPaneControls,
   HunkExtensionAPI,
 } from "hunkdiff/extension";
 import { reviewedHunkMarks } from "./src/highlights.ts";
@@ -17,6 +18,21 @@ const TONES: readonly ExtensionLineHighlightTone[] = [
   "error",
 ];
 const HIGHLIGHTER_ID = "reviewed";
+
+/**
+ * Keep the file-tree pane out of the way until there is progress to track.
+ * Our pane replaces the `hunk:files` slot whenever it is open, so the swap is
+ * just open/close: the first mark opens ours (revealing a hidden sidebar
+ * too), and returning to zero marks hands the slot back to the built-in.
+ */
+function syncFilesPane(panes: ExtensionPaneControls): void {
+  if (store.getState().reviewed.size > 0) {
+    panes.open("files");
+  } else {
+    panes.close("files");
+    panes.open("hunk:files");
+  }
+}
 
 export default function (hunk: HunkExtensionAPI) {
   const configuredTone = hunk.config.reviewedTone;
@@ -42,6 +58,8 @@ export default function (hunk: HunkExtensionAPI) {
         "warning",
       );
     }
+    // Marks survive soft reloads, so this also restores the tree after one.
+    syncFilesPane(ctx.panes);
   });
 
   // --- Marking -----------------------------------------------------------
@@ -58,6 +76,7 @@ export default function (hunk: HunkExtensionAPI) {
         return;
       }
       const reviewed = store.toggleHunk(file.path, hunk0);
+      syncFilesPane(ctx.panes);
       ctx.highlights.refresh(HIGHLIGHTER_ID, { fileId: file.id });
       const progress = store.fileProgress(file);
       ctx.notify(
@@ -75,6 +94,7 @@ export default function (hunk: HunkExtensionAPI) {
         return;
       }
       const reviewed = store.toggleFile(file);
+      syncFilesPane(ctx.panes);
       ctx.highlights.refresh(HIGHLIGHTER_ID, { fileId: file.id });
       ctx.notify(
         reviewed
@@ -88,6 +108,7 @@ export default function (hunk: HunkExtensionAPI) {
     { id: "resetReview", title: "Clear all reviewed marks" },
     (ctx) => {
       store.resetReviewed();
+      syncFilesPane(ctx.panes);
       ctx.highlights.refresh(HIGHLIGHTER_ID);
       ctx.notify("Cleared all reviewed marks");
     },
@@ -140,7 +161,10 @@ export default function (hunk: HunkExtensionAPI) {
   });
 
   hunk.registerCommand(
-    { id: "toggleHideReviewed", title: "Hide reviewed files" },
+    // State-neutral title: command titles are fixed at registration, so the
+    // menu entry can't flip to "Show reviewed files" while hiding is active —
+    // the files pane header carries that state instead.
+    { id: "toggleHideReviewed", title: "Toggle reviewed files visibility" },
     (ctx) => {
       const hide = !store.getState().hideReviewedFiles;
       store.setHideReviewedFiles(hide);

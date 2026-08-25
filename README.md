@@ -29,7 +29,7 @@ hunk diff --extension /path/to/checkout/mark-as-reviewed.tsx
 | `X` | `mark-as-reviewed.toggleFile` | Toggle every hunk in the current file (binary/skipped files toggle as a whole) |
 | `>` | `mark-as-reviewed.nextUnreviewed` | Jump to the next unreviewed hunk, across files, wrapping |
 | `<` | `mark-as-reviewed.prevUnreviewed` | Jump to the previous unreviewed hunk |
-| — | `mark-as-reviewed.toggleHideReviewed` | Hide fully-reviewed files from the review |
+| — | `mark-as-reviewed.toggleHideReviewed` | Toggle fully-reviewed files hidden/shown |
 | — | `mark-as-reviewed.resetReview` | Clear every reviewed mark |
 
 `>`/`<` are the shifted forms of Hunk's own `.`/`,` (next/previous file), so
@@ -57,16 +57,26 @@ and rebind:
 
 ## What you see
 
-- **File list** (replaces the built-in files pane): each row keeps its
-  `+adds/-dels` badges and adds a review badge — `(2/7)` while a file is in
+- **File tree** (swaps in for the built-in files pane once you start
+  marking): every file expands into its hunks. File rows keep their
+  `+adds/-dels` badges and add a review badge — `(2/7)` while a file is in
   progress, `☑` when every hunk is reviewed, `✓` for hunk-less files marked
-  whole. A summary line at the top counts the whole changeset.
+  whole. Hunk rows show the `@@` header and turn muted with a `✓` once
+  reviewed. A summary line at the top counts the whole changeset and flags
+  when reviewed files are being hidden. Until the first hunk is marked — and
+  again if every mark is cleared — the plain built-in file list keeps the
+  slot, so the tree only appears when there's progress to track.
+- **Click to jump, `x` to mark**: clicking a file or hunk row jumps the
+  review stream to it, so the usual `x`/`X` toggles then mark exactly what
+  you clicked.
 - **Diffs**: every line of a reviewed hunk is painted with a full-line
   highlight in the configured tone.
 - **Hide reviewed files**: when toggled on, fully-reviewed files are filtered
   out of the changeset on reload (the toggle triggers a refresh for you). If
   everything is reviewed, nothing is hidden — you get a toast instead of an
-  empty review.
+  empty review. Command titles can't change with state (Hunk registers them
+  once), so the toggle is named neutrally and the file-tree header shows
+  `· hiding reviewed files` while it's active.
 
 ## Configuration
 

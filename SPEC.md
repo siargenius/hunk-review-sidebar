@@ -15,7 +15,7 @@ Target API: `hunkdiff/extension` **apiVersion 8** (Hunk ≥ 0.19).
 | 1 | `r` toggles current hunk reviewed/unreviewed | `hunk.registerCommand` + `ctx.selection` |
 | 2 | `R` toggles all hunks in current file | `hunk.registerCommand` + `ctx.selection` |
 | 3 | Next / Previous Unreviewed Hunk commands (bindable, no default key) | `hunk.registerCommand` (no `key`) + `ctx.navigation.selectHunk` / `selectFile` |
-| 4 | File list shows `(n/total)` per file, `☑` when complete | `hunk.registerPane` with `replaces: "hunk:files"` |
+| 4 | File tree shows `(n/total)` per file (`☑` when complete) and per-hunk `✓` rows that jump on click | `hunk.registerPane` with `replaces: "hunk:files"` + `props.actions.selectHunk` |
 | 5 | Reviewed hunks get a visual style in the diff | MVP: `hunk.registerLineHighlighter`. Stretch: `hunk.registerFileView` (true dimming) |
 | 6 | View option: Hide Reviewed Files (and later Hunks) | Toggle command + `hunk.transformChangeset` + `ctx.commands.execute("hunk.app.refresh")` |
 
@@ -89,7 +89,7 @@ name).
 | `mark-as-reviewed.toggleFile` | Toggle file reviewed | `X` |
 | `mark-as-reviewed.nextUnreviewed` | Next unreviewed hunk | `>` |
 | `mark-as-reviewed.prevUnreviewed` | Previous unreviewed hunk | `<` |
-| `mark-as-reviewed.toggleHideReviewed` | Hide reviewed files | *(none)* |
+| `mark-as-reviewed.toggleHideReviewed` | Toggle reviewed files visibility | *(none)* |
 | `mark-as-reviewed.resetReview` | Clear all reviewed marks | *(none)* |
 
 **Defaults are `x` / `X` (locked decision).** Both are conflict-free against
@@ -125,14 +125,34 @@ Behavior details:
 A pane registered with `replaces: "hunk:files"` so it takes over the file
 list slot — `s` / View → Files pane keep working against our pane.
 
-Row rendering — **simple flat list (locked decision)**, keeping the
-built-in's `+adds/-dels` stat badges and appending the review badge:
+Row rendering — **file/hunk tree**, keeping the built-in's `+adds/-dels`
+stat badges and appending the review badge, with one clickable sub-row per
+hunk:
 
 ```
 src/app.ts       +40 -12  (2/7)
+  1. @@ -10,7 +10,9 @@ renderRow()      ✓
+  2. @@ -40,6 +42,8 @@ main()
 src/util.ts      +10  -3   ☑
 assets/logo.png            ✓   ← no hunks, marked via X
 ```
+
+Clicking a hunk row calls `actions.selectHunk(file.id, hunk.index)`, so the
+global `x`/`X` toggles then act on exactly what was clicked. The selected
+file/hunk row follows `props.selectedFileId` / `props.selectedHunkIndex`
+(scroll-follow included). The header row counts the whole changeset and adds
+`· hiding reviewed files` while `hideReviewedFiles` is active — command
+titles are frozen at registration (§1.3), so the pane is the surface that
+carries the toggle's state.
+
+**The tree only appears once there is progress to track.** A replacement
+pane claims the `hunk:files` slot whenever it is open, so the swap is plain
+open/close through `ctx.panes`: with zero marks the built-in file list keeps
+the slot (`close` ours, `open("hunk:files")`); the first mark opens ours
+(which also reveals a hidden sidebar — the open is never silent). Synced
+after every mutation (`toggleHunk`, `toggleFile`, `resetReview`) and on
+`changeset_loaded`, which also restores the tree after a soft reload since
+marks survive it.
 
 - Stat badges mirror the built-in pane (`+${additions} -${deletions}` in
   the theme's add/remove colors, honoring `statsTruncated`).
@@ -284,6 +304,7 @@ the `hunk-mark-as-reviewed` id + updated docs if either fails):
 3. **Naming:** repo stays `hunk-mark-as-reviewed`; extension id is
    `mark-as-reviewed` via a root-level `mark-as-reviewed.tsx` entry file
    and no `hunk.extensions` manifest (§8).
-4. **File-list pane:** simple flat list, keeping the built-in `+/-` stat
-   badges, with the review badge appended.
+4. **File-list pane:** file/hunk tree, keeping the built-in `+/-` stat
+   badges, with the review badge appended per file and a `✓` per reviewed
+   hunk; hunk rows jump the review stream on click.
 5. **Marking:** toggle semantics — pressing `x`/`X` again un-reviews.
