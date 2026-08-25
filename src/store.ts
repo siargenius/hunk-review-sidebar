@@ -33,6 +33,9 @@ let state: ReviewStoreState = {
  */
 let knownHunks: ReadonlyMap<string, readonly ExtensionDiffHunk[]> = new Map();
 
+/** Files of the most recent `changeset_loaded`, for cross-file navigation. */
+let latestFiles: readonly ExtensionDiffFile[] = [];
+
 const listeners = new Set<() => void>();
 
 export function subscribe(listener: () => void): () => void {
@@ -65,12 +68,15 @@ export function fileKey(path: string): string {
  return [FILE_PREFIX, path].join("\0");
 }
 
+/** True for path-only file marks (as opposed to hunk marks). */
+function isFileKey(key: string): boolean {
+ return key.startsWith(`${FILE_PREFIX}\0`);
+}
+
 /** Read the path back out of a mark key. */
 function keyPath(key: string): string {
  const rest = key.slice(key.indexOf("\0") + 1);
- return key.startsWith(`${FILE_PREFIX}\0`)
-  ? rest
-  : rest.slice(0, rest.indexOf("\0"));
+ return isFileKey(key) ? rest : rest.slice(0, rest.indexOf("\0"));
 }
 
 export function isHunkReviewed(path: string, hunk: ExtensionDiffHunk): boolean {
@@ -84,8 +90,18 @@ export interface FileProgress {
  readonly fileReviewed: boolean;
 }
 
+/**
+ * Hunk summaries for a file, falling back to the last `noteFiles` record for
+ * surfaces handed files without `hunks` (transforms, some commands).
+ */
+export function hunksFor(
+ file: ExtensionDiffFile,
+): readonly ExtensionDiffHunk[] {
+ return file.hunks ?? knownHunks.get(file.path) ?? [];
+}
+
 export function fileProgress(file: ExtensionDiffFile): FileProgress {
- const hunks = file.hunks ?? knownHunks.get(file.path) ?? [];
+ const hunks = hunksFor(file);
  if (hunks.length === 0) {
   return {
    reviewed: 0,
@@ -133,7 +149,7 @@ export function toggleHunk(path: string, hunk: ExtensionDiffHunk): boolean {
  * reviewed flag.
  */
 export function toggleFile(file: ExtensionDiffFile): boolean {
- const hunks = file.hunks ?? knownHunks.get(file.path) ?? [];
+ const hunks = hunksFor(file);
  const next = new Set(state.reviewed);
  const fullyReviewed = isFileFullyReviewed(file);
  if (hunks.length === 0) {
@@ -161,14 +177,15 @@ export function setHideReviewedFiles(hide: boolean): void {
  setState({ ...state, hideReviewedFiles: hide });
 }
 
-/** Record the hunk summaries of a freshly loaded changeset. */
+/** Record the file list of a freshly loaded changeset. */
 export function noteFiles(files: readonly ExtensionDiffFile[]): void {
+ latestFiles = files;
  knownHunks = new Map(files.map((file) => [file.path, file.hunks ?? []]));
 }
 
-/** Hunk summaries recorded for a path, for surfaces handed files without `hunks`. */
-export function knownHunksFor(path: string): readonly ExtensionDiffHunk[] {
- return knownHunks.get(path) ?? [];
+/** Files of the most recent `changeset_loaded` (post-transform). */
+export function getLatestFiles(): readonly ExtensionDiffFile[] {
+ return latestFiles;
 }
 
 /**
@@ -188,14 +205,8 @@ export function reconcile(files: readonly ExtensionDiffFile[]): number {
  const next = new Set<string>();
  for (const key of state.reviewed) {
   const live = liveKeysByPath.get(keyPath(key));
-  let keep: boolean;
-  if (!live) {
-   keep = state.hideReviewedFiles;
-  } else if (key.startsWith(`${FILE_PREFIX}\0`)) {
-   keep = true;
-  } else {
-   keep = live.has(key);
-  }
+  // Absent path: keep while our own transform may be filtering the file out.
+  const keep = live ? isFileKey(key) || live.has(key) : state.hideReviewedFiles;
   if (keep) next.add(key);
   else dropped++;
  }

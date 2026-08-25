@@ -10,9 +10,9 @@ import type {
 import {
   fileProgress,
   getState,
+  hunksFor,
   isFileFullyReviewed,
   isHunkReviewed,
-  knownHunksFor,
   subscribe,
   totalProgress,
 } from "./store.ts";
@@ -41,21 +41,12 @@ function pathColor(file: ExtensionDiffFile, theme: ExtensionPaneTheme): string {
   }
 }
 
-/** Hunk summaries for a file, falling back to the store's last record. */
-function hunksOf(file: ExtensionDiffFile): readonly ExtensionDiffHunk[] {
-  return file.hunks ?? knownHunksFor(file.path);
-}
-
-/** Directory portion of a path, trailing slash included; "" at the root. */
-function dirOf(path: string): string {
+/** Split a path into its directory (trailing slash, "" at root) and base name. */
+function splitPath(path: string): { dir: string; base: string } {
   const slash = path.lastIndexOf("/");
-  return slash === -1 ? "" : path.slice(0, slash + 1);
-}
-
-/** Final path segment. */
-function baseOf(path: string): string {
-  const slash = path.lastIndexOf("/");
-  return slash === -1 ? path : path.slice(slash + 1);
+  return slash === -1
+    ? { dir: "", base: path }
+    : { dir: path.slice(0, slash + 1), base: path.slice(slash + 1) };
 }
 
 /** One-letter change indicator, matching the built-in file list. */
@@ -112,7 +103,7 @@ function FileRow({ file, selected, width, theme, onSelect }: FileRowProps) {
   const right = [stats, count].filter(Boolean).join(" ");
   // Left fixed cells: " ☐ M " — checkbox and status letter.
   const nameMax = Math.max(1, width - right.length - 6);
-  const name = truncateMiddle(baseOf(file.path), nameMax);
+  const name = truncateMiddle(splitPath(file.path).base, nameMax);
   return (
     <box
       id={`row-${file.id}`}
@@ -232,7 +223,7 @@ export function ReviewedFilesPane(props: ExtensionPaneProps) {
   const rows: ReactNode[] = [];
   let lastDir: string | null = null;
   for (const file of props.files) {
-    const dir = dirOf(file.path);
+    const dir = splitPath(file.path).dir;
     if (dir !== lastDir) {
       lastDir = dir;
       if (dir !== "") {
@@ -260,7 +251,7 @@ export function ReviewedFilesPane(props: ExtensionPaneProps) {
           theme={props.theme}
           onSelect={() => props.actions.selectFile(file.id)}
         />
-        {hunksOf(file).map((hunk) => (
+        {hunksFor(file).map((hunk) => (
           <HunkRow
             key={hunk.index}
             file={file}

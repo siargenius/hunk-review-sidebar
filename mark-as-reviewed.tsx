@@ -1,6 +1,5 @@
 import type {
   ExtensionCommandContext,
-  ExtensionDiffFile,
   ExtensionLineHighlightTone,
   ExtensionPaneControls,
   HunkExtensionAPI,
@@ -45,13 +44,10 @@ export default function (hunk: HunkExtensionAPI) {
     : "info";
   store.setHideReviewedFiles(hunk.config.hideReviewedFiles === true);
 
-  // The most recent (post-transform) changeset's files, for the navigation
-  // commands — a command's selection only names the current file, so walking
-  // across file boundaries needs the visible list from the last load event.
-  let latestFiles: readonly ExtensionDiffFile[] = [];
-
+  // The most recent (post-transform) changeset lives in the store — a
+  // command's selection only names the current file, so walking across file
+  // boundaries needs the visible list from the last load event.
   hunk.on("changeset_loaded", ({ changeset }, ctx) => {
-    latestFiles = changeset.files;
     store.noteFiles(changeset.files);
     const dropped = store.reconcile(changeset.files);
     if (dropped > 0) {
@@ -121,7 +117,7 @@ export default function (hunk: HunkExtensionAPI) {
   const goUnreviewed =
     (direction: 1 | -1) => (ctx: ExtensionCommandContext) => {
       const target = findUnreviewedHunk(
-        latestFiles,
+        store.getLatestFiles(),
         {
           fileId: ctx.selection.file?.id ?? null,
           hunkIndex: ctx.selection.hunkIndex,
@@ -147,18 +143,25 @@ export default function (hunk: HunkExtensionAPI) {
 
   // --- Hiding reviewed files -------------------------------------------------
 
+  // Transforms re-run on every refresh, so only toast when the hidden
+  // count actually changes — otherwise the same notice repeats endlessly.
+  let lastHidden = 0;
+
   hunk.transformChangeset((changeset, ctx) => {
     if (!store.getState().hideReviewedFiles) return changeset;
     const kept = changeset.files.filter(
       (file) => !store.isPathFullyReviewed(file.path),
     );
     const hidden = changeset.files.length - kept.length;
+    const changed = hidden !== lastHidden;
+    lastHidden = hidden;
     if (hidden === 0) return changeset;
     if (kept.length === 0) {
-      ctx.notify("All files reviewed — nothing hidden");
+      if (changed) ctx.notify("All files reviewed — nothing hidden");
       return changeset;
     }
-    ctx.notify(`Hid ${hidden} reviewed ${hidden === 1 ? "file" : "files"}`);
+    if (changed)
+      ctx.notify(`Hid ${hidden} reviewed ${hidden === 1 ? "file" : "files"}`);
     return { ...changeset, files: kept };
   });
 
@@ -170,6 +173,7 @@ export default function (hunk: HunkExtensionAPI) {
     (ctx) => {
       const hide = !store.getState().hideReviewedFiles;
       store.setHideReviewedFiles(hide);
+      lastHidden = 0; // re-arm the transform's toast for the new mode
       ctx.notify(
         hide ? "Hiding fully-reviewed files" : "Showing reviewed files",
       );
@@ -193,10 +197,9 @@ export default function (hunk: HunkExtensionAPI) {
   hunk.registerLineHighlighter({
     id: HIGHLIGHTER_ID,
     highlight({ file }) {
-      const hunks = file.hunks ?? store.knownHunksFor(file.path);
-      const reviewed = hunks.filter((candidate) =>
-        store.isHunkReviewed(file.path, candidate),
-      );
+      const reviewed = store
+        .hunksFor(file)
+        .filter((candidate) => store.isHunkReviewed(file.path, candidate));
       return reviewedHunkMarks(file, reviewed, tone);
     },
   });
