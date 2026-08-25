@@ -1,4 +1,5 @@
 import { useEffect, useRef, useSyncExternalStore } from "react";
+import type { ReactNode } from "react";
 import type { ScrollBoxRenderable } from "@opentui/core";
 import type {
   ExtensionDiffFile,
@@ -45,6 +46,39 @@ function hunksOf(file: ExtensionDiffFile): readonly ExtensionDiffHunk[] {
   return file.hunks ?? knownHunksFor(file.path);
 }
 
+/** Directory portion of a path, trailing slash included; "" at the root. */
+function dirOf(path: string): string {
+  const slash = path.lastIndexOf("/");
+  return slash === -1 ? "" : path.slice(0, slash + 1);
+}
+
+/** Final path segment. */
+function baseOf(path: string): string {
+  const slash = path.lastIndexOf("/");
+  return slash === -1 ? path : path.slice(slash + 1);
+}
+
+/** One-letter change indicator, matching the built-in file list. */
+function statusLetter(file: ExtensionDiffFile): string {
+  if (file.isUntracked) return "?";
+  switch (file.changeType) {
+    case "new":
+      return "A";
+    case "deleted":
+      return "D";
+    case "rename-pure":
+    case "rename-changed":
+      return "R";
+    default:
+      return "M";
+  }
+}
+
+/** Checkbox glyphs: empty, partially reviewed, fully reviewed. */
+const CHECK_TODO = "\u2610"; // ☐
+const CHECK_PARTIAL = "\u25E7"; // ◧
+const CHECK_DONE = "\u25A3"; // ▣
+
 interface FileRowProps {
   readonly file: ExtensionDiffFile;
   readonly selected: boolean;
@@ -56,22 +90,29 @@ interface FileRowProps {
 function FileRow({ file, selected, width, theme, onSelect }: FileRowProps) {
   const progress = fileProgress(file);
   const done = isFileFullyReviewed(file);
+  const check = done
+    ? CHECK_DONE
+    : progress.reviewed > 0
+      ? CHECK_PARTIAL
+      : CHECK_TODO;
+  const checkColor = done
+    ? theme.badgeAdded
+    : progress.reviewed > 0
+      ? theme.accent
+      : theme.muted;
   const truncated = file.statsTruncated ? "+" : "";
   const stats =
     file.stats.additions + file.stats.deletions > 0
       ? `+${file.stats.additions}${truncated} -${file.stats.deletions}${truncated}`
       : "";
-  const badge =
-    progress.total > 0
-      ? done
-        ? "☑"
-        : `(${progress.reviewed}/${progress.total})`
-      : done
-        ? "✓"
-        : "";
-  const right = [stats, badge].filter(Boolean).join(" ");
-  const pathMax = Math.max(1, width - right.length - 3);
-  const label = truncateMiddle(file.path, pathMax);
+  const count =
+    progress.total > 0 && !done
+      ? `(${progress.reviewed}/${progress.total})`
+      : "";
+  const right = [stats, count].filter(Boolean).join(" ");
+  // Left fixed cells: " ☐ M " — checkbox and status letter.
+  const nameMax = Math.max(1, width - right.length - 6);
+  const name = truncateMiddle(baseOf(file.path), nameMax);
   return (
     <box
       id={`row-${file.id}`}
@@ -84,12 +125,17 @@ function FileRow({ file, selected, width, theme, onSelect }: FileRowProps) {
       }}
       onMouseUp={onSelect}
     >
-      <text
-        content={` ${label}`}
-        style={{
-          fg: selected ? theme.accent : pathColor(file, theme),
-        }}
-      />
+      <box style={{ flexDirection: "row", height: 1 }}>
+        <text content={` ${check} `} style={{ fg: checkColor }} />
+        <text
+          content={`${statusLetter(file)} `}
+          style={{ fg: pathColor(file, theme) }}
+        />
+        <text
+          content={name}
+          style={{ fg: selected ? theme.accent : theme.text }}
+        />
+      </box>
       <text
         content={right.length > 0 ? `${right} ` : ""}
         style={{
@@ -118,9 +164,11 @@ function HunkRow({
   onSelect,
 }: HunkRowProps) {
   const reviewed = isHunkReviewed(file.path, hunk);
-  const badge = reviewed ? "✓" : "";
-  // Leading indent + ordinal (" 12. ") + trailing badge cell.
-  const labelMax = Math.max(1, width - badge.length - 7);
+  const check = reviewed ? CHECK_DONE : CHECK_TODO;
+  const ordinal = `${hunk.index + 1}.`;
+  // Leading indent + checkbox + ordinal ("   ☐ 12. ").
+  const prefix = `   ${check} ${ordinal} `;
+  const labelMax = Math.max(1, width - prefix.length - 1);
   const label = truncateMiddle(hunk.header, labelMax);
   return (
     <box
@@ -129,36 +177,37 @@ function HunkRow({
         flexDirection: "row",
         width: "100%",
         height: 1,
-        justifyContent: "space-between",
         backgroundColor: selected ? theme.selectedHunk : undefined,
       }}
       onMouseUp={onSelect}
     >
       <text
-        content={`  ${hunk.index + 1}. ${label}`}
+        content={`   ${check} `}
+        style={{ fg: reviewed ? theme.badgeAdded : theme.muted }}
+      />
+      <text
+        content={`${ordinal} ${label}`}
         style={{
           fg: selected ? theme.accent : reviewed ? theme.muted : theme.text,
         }}
-      />
-      <text
-        content={badge.length > 0 ? `${badge} ` : ""}
-        style={{ fg: theme.badgeAdded }}
       />
     </box>
   );
 }
 
 /**
- * The "Review" pane: a tree of files and their hunks, shown in place of the
- * built-in file list while any mark exists (the entry point swaps the two
- * via open/close; with zero marks only the built-in list is around and `s`
- * toggles it alone). File rows keep the built-in's +/- stat badges and
- * append a review badge — `(n/total)` in progress, `☑` once every hunk is
- * reviewed, `✓` for hunk-less files marked reviewed whole. Hunk rows show the
- * `@@` header (muted with a `✓` once reviewed) and jump the review stream to
- * the hunk on click, so the global `x`/`X` toggles then act on what was
- * clicked. The header row counts the whole changeset and flags when
- * fully-reviewed files are being hidden.
+ * The "Review" pane: a tree of directories, files, and their hunks, shown
+ * in place of the built-in file list while any mark exists (the entry point
+ * swaps the two via open/close; with zero marks only the built-in list is
+ * around and `s` toggles it alone). The layout mirrors the built-in list's
+ * simplicity — a dimmed directory header, then one row per file with a
+ * colored status letter and right-aligned +/- stats — with hunks nested one
+ * level deeper. Every row leads with a unicode checkbox: `▣` reviewed, `◧`
+ * partially reviewed (files only), `☐` not reviewed. In-progress files also
+ * keep a `(n/total)` count beside their stats. Hunk rows jump the review
+ * stream to the hunk on click, so the global `x`/`X` toggles then act on
+ * what was clicked. The header row counts the whole changeset and flags
+ * when fully-reviewed files are being hidden.
  */
 export function ReviewedFilesPane(props: ExtensionPaneProps) {
   // Subscribe to the module-level review store so toggles rerender the list
@@ -177,6 +226,57 @@ export function ReviewedFilesPane(props: ExtensionPaneProps) {
   const allReviewed = totals.total > 0 && totals.reviewed === totals.total;
   const summary = ` ${totals.reviewed}/${totals.total} reviewed`;
   const hiding = state.hideReviewedFiles ? " · hiding reviewed files" : "";
+  // Group files under a dimmed directory header, emitted whenever the
+  // directory changes — the changeset arrives path-sorted, so siblings are
+  // already adjacent.
+  const rows: ReactNode[] = [];
+  let lastDir: string | null = null;
+  for (const file of props.files) {
+    const dir = dirOf(file.path);
+    if (dir !== lastDir) {
+      lastDir = dir;
+      if (dir !== "") {
+        rows.push(
+          <box key={`dir-${dir}`} style={{ height: 1, width: "100%" }}>
+            <text content={` ${dir}`} style={{ fg: props.theme.muted }} />
+          </box>,
+        );
+      }
+    }
+    rows.push(
+      <box
+        key={file.id}
+        style={{
+          flexDirection: "column",
+          width: "100%",
+        }}
+      >
+        <FileRow
+          file={file}
+          selected={
+            file.id === props.selectedFileId && props.selectedHunkIndex === null
+          }
+          width={props.width}
+          theme={props.theme}
+          onSelect={() => props.actions.selectFile(file.id)}
+        />
+        {hunksOf(file).map((hunk) => (
+          <HunkRow
+            key={hunk.index}
+            file={file}
+            hunk={hunk}
+            selected={
+              file.id === props.selectedFileId &&
+              hunk.index === props.selectedHunkIndex
+            }
+            width={props.width}
+            theme={props.theme}
+            onSelect={() => props.actions.selectHunk(file.id, hunk.index)}
+          />
+        ))}
+      </box>,
+    );
+  }
   return (
     <scrollbox
       ref={scrollRef}
@@ -193,40 +293,7 @@ export function ReviewedFilesPane(props: ExtensionPaneProps) {
           }}
         />
       </box>
-      {props.files.map((file) => (
-        <box
-          key={file.id}
-          style={{
-            flexDirection: "column",
-            width: "100%",
-          }}
-        >
-          <FileRow
-            file={file}
-            selected={
-              file.id === props.selectedFileId &&
-              props.selectedHunkIndex === null
-            }
-            width={props.width}
-            theme={props.theme}
-            onSelect={() => props.actions.selectFile(file.id)}
-          />
-          {hunksOf(file).map((hunk) => (
-            <HunkRow
-              key={hunk.index}
-              file={file}
-              hunk={hunk}
-              selected={
-                file.id === props.selectedFileId &&
-                hunk.index === props.selectedHunkIndex
-              }
-              width={props.width}
-              theme={props.theme}
-              onSelect={() => props.actions.selectHunk(file.id, hunk.index)}
-            />
-          ))}
-        </box>
-      ))}
+      {rows}
     </scrollbox>
   );
 }
