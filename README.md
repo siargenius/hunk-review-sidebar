@@ -29,7 +29,6 @@ hunk diff --extension /path/to/checkout/mark-as-reviewed.tsx
 | `X` | `mark-as-reviewed.toggleFile` | Toggle every hunk in the current file (binary/skipped files toggle as a whole) |
 | `>` | `mark-as-reviewed.nextUnreviewed` | Jump to the next unreviewed hunk, across files, wrapping |
 | `<` | `mark-as-reviewed.prevUnreviewed` | Jump to the previous unreviewed hunk |
-| — | `mark-as-reviewed.toggleHideReviewed` | Toggle fully-reviewed files hidden/shown |
 | — | `mark-as-reviewed.resetReview` | Clear every reviewed mark |
 
 `>`/`<` are the shifted forms of Hunk's own `.`/`,` (next/previous file), so
@@ -72,12 +71,13 @@ and rebind:
   you clicked.
 - **Diffs**: every line of a reviewed hunk is painted with a full-line
   highlight in the configured tone.
-- **Hide reviewed files**: when toggled on, fully-reviewed files are filtered
-  out of the changeset on reload (the toggle triggers a refresh for you). If
-  everything is reviewed, nothing is hidden — you get a toast instead of an
-  empty review. Command titles can't change with state (Hunk registers them
-  once), so the toggle is named neutrally and the file-tree header shows
-  `· hiding reviewed files` while it's active.
+- **Hide reviewed files**: the Review pane has a clickable `☐ Hide reviewed
+  files` checkbox under its header. While it's checked, fully-reviewed files
+  are filtered out of the changeset (the click triggers a refresh for you).
+  If everything is reviewed, nothing is hidden — you get a toast instead of
+  an empty review. The checkbox lives in the pane rather than the Extensions
+  menu because extension menu entries can't show a live check state (Hunk
+  renders `[x]` only for its own built-in menu items).
 
 ## Configuration
 

@@ -1,10 +1,14 @@
 import type {
+  ExtensionCommand,
   ExtensionCommandContext,
+  ExtensionCommandHandler,
   ExtensionLineHighlightTone,
   ExtensionPaneControls,
   HunkExtensionAPI,
 } from "hunkdiff/extension";
+import { hideFullyReviewedFiles } from "./src/hide.ts";
 import { reviewedHunkMarks } from "./src/highlights.ts";
+import { noteCommandControls } from "./src/host.ts";
 import { findUnreviewedHunk } from "./src/nav.ts";
 import { ReviewedFilesPane } from "./src/pane.tsx";
 import * as store from "./src/store.ts";
@@ -44,6 +48,18 @@ export default function (hunk: HunkExtensionAPI) {
     : "info";
   store.setHideReviewedFiles(hunk.config.hideReviewedFiles === true);
 
+  // Pane components receive no command controls of their own, so every
+  // command registration goes through this wrapper to stash the handler's
+  // controls — the pane's hide checkbox refreshes through them (host.ts).
+  const command = (
+    definition: ExtensionCommand,
+    handler: ExtensionCommandHandler,
+  ): void =>
+    hunk.registerCommand(definition, (ctx) => {
+      noteCommandControls(ctx.commands);
+      return handler(ctx);
+    });
+
   // The most recent (post-transform) changeset lives in the store — a
   // command's selection only names the current file, so walking across file
   // boundaries needs the visible list from the last load event.
@@ -62,7 +78,7 @@ export default function (hunk: HunkExtensionAPI) {
 
   // --- Marking -----------------------------------------------------------
 
-  hunk.registerCommand(
+  command(
     { id: "toggleHunk", title: "Toggle hunk reviewed", key: "x" },
     (ctx) => {
       const { file, hunkIndex } = ctx.selection;
@@ -83,7 +99,7 @@ export default function (hunk: HunkExtensionAPI) {
     },
   );
 
-  hunk.registerCommand(
+  command(
     { id: "toggleFile", title: "Toggle file reviewed", key: "X" },
     (ctx) => {
       const { file } = ctx.selection;
@@ -102,15 +118,12 @@ export default function (hunk: HunkExtensionAPI) {
     },
   );
 
-  hunk.registerCommand(
-    { id: "resetReview", title: "Clear all reviewed marks" },
-    (ctx) => {
-      store.resetReviewed();
-      syncFilesPane(ctx.panes);
-      ctx.highlights.refresh(HIGHLIGHTER_ID);
-      ctx.notify("Cleared all reviewed marks");
-    },
-  );
+  command({ id: "resetReview", title: "Clear all reviewed marks" }, (ctx) => {
+    store.resetReviewed();
+    syncFilesPane(ctx.panes);
+    ctx.highlights.refresh(HIGHLIGHTER_ID);
+    ctx.notify("Cleared all reviewed marks");
+  });
 
   // --- Navigation ----------------------------------------------------------
 
@@ -132,53 +145,23 @@ export default function (hunk: HunkExtensionAPI) {
       ctx.navigation.selectHunk(target.fileId, target.hunkIndex);
     };
 
-  hunk.registerCommand(
+  command(
     { id: "nextUnreviewed", title: "Next unreviewed hunk", key: ">" },
     goUnreviewed(1),
   );
-  hunk.registerCommand(
+  command(
     { id: "prevUnreviewed", title: "Previous unreviewed hunk", key: "<" },
     goUnreviewed(-1),
   );
 
   // --- Hiding reviewed files -------------------------------------------------
 
-  // Transforms re-run on every refresh, so only toast when the hidden
-  // count actually changes — otherwise the same notice repeats endlessly.
-  let lastHidden = 0;
-
-  hunk.transformChangeset((changeset, ctx) => {
-    if (!store.getState().hideReviewedFiles) return changeset;
-    const kept = changeset.files.filter(
-      (file) => !store.isPathFullyReviewed(file.path),
-    );
-    const hidden = changeset.files.length - kept.length;
-    const changed = hidden !== lastHidden;
-    lastHidden = hidden;
-    if (hidden === 0) return changeset;
-    if (kept.length === 0) {
-      if (changed) ctx.notify("All files reviewed — nothing hidden");
-      return changeset;
-    }
-    if (changed)
-      ctx.notify(`Hid ${hidden} reviewed ${hidden === 1 ? "file" : "files"}`);
-    return { ...changeset, files: kept };
-  });
-
-  hunk.registerCommand(
-    // State-neutral title: command titles are fixed at registration, so the
-    // menu entry can't flip to "Show reviewed files" while hiding is active —
-    // the files pane header carries that state instead.
-    { id: "toggleHideReviewed", title: "Toggle reviewed files visibility" },
-    (ctx) => {
-      const hide = !store.getState().hideReviewedFiles;
-      store.setHideReviewedFiles(hide);
-      lastHidden = 0; // re-arm the transform's toast for the new mode
-      ctx.notify(
-        hide ? "Hiding fully-reviewed files" : "Showing reviewed files",
-      );
-      ctx.commands.execute("hunk.app.refresh");
-    },
+  // No command for the toggle itself: extension menu entries can't show a
+  // live check state, so the Review pane carries a clickable "Hide reviewed
+  // files" checkbox instead (see src/hide.ts). Only the transform remains
+  // here, delegating to the shared hide logic.
+  hunk.transformChangeset((changeset, ctx) =>
+    hideFullyReviewedFiles(changeset, (message) => ctx.notify(message)),
   );
 
   // --- Presentation ----------------------------------------------------------

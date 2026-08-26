@@ -17,7 +17,7 @@ Target API: `hunkdiff/extension` **apiVersion 8** (Hunk ≥ 0.19).
 | 3 | Next / Previous Unreviewed Hunk commands (bindable, no default key) | `hunk.registerCommand` (no `key`) + `ctx.navigation.selectHunk` / `selectFile` |
 | 4 | Review pane (file tree) shows `(n/total)` per file (`☑` when complete) and per-hunk `✓` rows that jump on click; visible only while marks exist | `hunk.registerPane` (standalone pane) + `ctx.panes` open/close + `props.actions.selectHunk` |
 | 5 | Reviewed hunks get a visual style in the diff | MVP: `hunk.registerLineHighlighter`. Stretch: `hunk.registerFileView` (true dimming) |
-| 6 | View option: Hide Reviewed Files (and later Hunks) | Toggle command + `hunk.transformChangeset` + `ctx.commands.execute("hunk.app.refresh")` |
+| 6 | View option: Hide Reviewed Files (and later Hunks) | Pane checkbox row + `hunk.transformChangeset` + stashed `ctx.commands.execute("hunk.app.refresh")` |
 
 ### Hard constraints discovered (these shape the design)
 
@@ -29,9 +29,14 @@ Target API: `hunkdiff/extension` **apiVersion 8** (Hunk ≥ 0.19).
    pane is a bundled extension on the same API, so this is a supported,
    dogfooded path — but we re-implement the list rows ourselves (grouping,
    stat badges, scroll-follow are on us; the docs give the exact recipe).
-3. **Menu entries are "not contributable yet."** "Hide Reviewed" cannot be a
-   literal View-menu item. Every registered command automatically appears in
-   the **Extensions** menu, so the toggle lives there and is key-bindable.
+3. **Menu entries are "not contributable yet" — and can't show state.** "Hide
+   Reviewed" cannot be a literal View-menu item, and while every registered
+   command automatically appears in the **Extensions** menu, extension menu
+   entries get no `checked` flag (the host renders `[x]`/`[ ]` only for its
+   own built-in menu specs) and command titles are frozen at registration.
+   So the toggle is not a command at all: it lives in the Review pane as a
+   clickable `☐ Hide reviewed files` checkbox row that both shows and flips
+   the mode. Trade-off: no menu entry and nothing to keybind.
 4. **Hunks can't be filtered out of a file.** `transformChangeset` can
    filter/reorder *files*; hunks live in the opaque `metadata` blob and must
    pass through untouched. "Hide reviewed *hunks*" is only achievable via a
@@ -89,7 +94,6 @@ name).
 | `mark-as-reviewed.toggleFile` | Toggle file reviewed | `X` |
 | `mark-as-reviewed.nextUnreviewed` | Next unreviewed hunk | `>` |
 | `mark-as-reviewed.prevUnreviewed` | Previous unreviewed hunk | `<` |
-| `mark-as-reviewed.toggleHideReviewed` | Toggle reviewed files visibility | *(none)* |
 | `mark-as-reviewed.resetReview` | Clear all reviewed marks | *(none)* |
 
 **Defaults are `x` / `X` (locked decision).** Both are conflict-free against
@@ -147,10 +151,10 @@ assets/logo.png            ✓   ← no hunks, marked via X
 Clicking a hunk row calls `actions.selectHunk(file.id, hunk.index)`, so the
 global `x`/`X` toggles then act on exactly what was clicked. The selected
 file/hunk row follows `props.selectedFileId` / `props.selectedHunkIndex`
-(scroll-follow included). The header row counts the whole changeset and adds
-`· hiding reviewed files` while `hideReviewedFiles` is active — command
-titles are frozen at registration (§1.3), so the pane is the surface that
-carries the toggle's state.
+(scroll-follow included). The header row counts the whole changeset; beneath
+it sits the `☐ Hide reviewed files` checkbox row (§1.3 explains why the
+pane, not a menu command, carries this toggle). Clicking it flips
+`hideReviewedFiles` and refreshes through stashed command controls (§7).
 
 - Stat badges mirror the built-in pane (`+${additions} -${deletions}` in
   the theme's add/remove colors, honoring `statsTruncated`).
@@ -217,15 +221,22 @@ fine here (no exec-adjacent values).
 
 ## 7. "Hide Reviewed" toggle
 
-- `toggleHideReviewed` flips the store flag, then runs
-  `ctx.commands.execute("hunk.app.refresh")` so `transformChangeset`
-  re-runs and filters out fully-reviewed files.
+- The pane's checkbox row calls `toggleHideReviewedFiles` (src/hide.ts):
+  flip the store flag, re-arm the transform's toast, toast the new mode via
+  `props.actions.notify`, then refresh so `transformChangeset` re-runs and
+  filters out fully-reviewed files.
+- Pane components receive no command controls, so the refresh runs through
+  the most recent command handler's stashed `ctx.commands` (src/host.ts).
+  The stash is session-scoped — the pane is only ever open after a marking
+  command has run, so live controls are always available; a stale lease
+  after an extension reload fails closed (`execute` returns false).
 - Guard: if filtering would hide **every** file, keep the changeset intact
   and notify instead (avoids a dead empty review).
 - Reviewed state survives the reload (keyed by path+hunk identity, §2).
 - "Hide reviewed hunks" within a file is deferred to the v2 file view (§5);
   v1's answer is the next-unreviewed navigation commands.
-- Menu placement: Extensions menu (host limitation §1.3), plus bindable.
+- No command/menu entry at all: extension menu entries can't show a check
+  state (§1.3). Trade-off: the toggle is mouse-only, with nothing to keybind.
 
 ---
 

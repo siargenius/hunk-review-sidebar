@@ -7,6 +7,7 @@ import type {
   ExtensionPaneProps,
   ExtensionPaneTheme,
 } from "hunkdiff/extension";
+import { toggleHideReviewedFiles } from "./hide.ts";
 import {
   fileProgress,
   getState,
@@ -197,8 +198,10 @@ function HunkRow({
  * partially reviewed (files only), `☐` not reviewed. In-progress files also
  * keep a `(n/total)` count beside their stats. Hunk rows jump the review
  * stream to the hunk on click, so the global `x`/`X` toggles then act on
- * what was clicked. The header row counts the whole changeset and flags
- * when fully-reviewed files are being hidden.
+ * what was clicked. The header row counts the whole changeset; beneath it
+ * sits a clickable "Hide reviewed files" checkbox — the only surface that
+ * both shows and flips that mode, since extension menu entries can't carry
+ * a live check state.
  */
 export function ReviewedFilesPane(props: ExtensionPaneProps) {
   // Subscribe to the module-level review store so toggles rerender the list
@@ -216,7 +219,7 @@ export function ReviewedFilesPane(props: ExtensionPaneProps) {
   const totals = totalProgress(props.files);
   const allReviewed = totals.total > 0 && totals.reviewed === totals.total;
   const summary = ` ${totals.reviewed}/${totals.total} reviewed`;
-  const hiding = state.hideReviewedFiles ? " · hiding reviewed files" : "";
+  const hideCheck = state.hideReviewedFiles ? CHECK_DONE : CHECK_TODO;
   // Group files under a dimmed directory header, emitted whenever the
   // directory changes — the changeset arrives path-sorted, so siblings are
   // already adjacent.
@@ -278,11 +281,25 @@ export function ReviewedFilesPane(props: ExtensionPaneProps) {
     >
       <box style={{ height: 1, width: "100%" }}>
         <text
-          content={`${summary}${hiding}`}
+          content={summary}
           style={{
             fg: allReviewed ? props.theme.badgeAdded : props.theme.muted,
           }}
         />
+      </box>
+      <box
+        style={{ flexDirection: "row", height: 1, width: "100%" }}
+        onMouseUp={() => toggleHideReviewedFiles(props.actions.notify)}
+      >
+        <text
+          content={` ${hideCheck} `}
+          style={{
+            fg: state.hideReviewedFiles
+              ? props.theme.badgeAdded
+              : props.theme.muted,
+          }}
+        />
+        <text content="Hide reviewed files" style={{ fg: props.theme.text }} />
       </box>
       {rows}
     </scrollbox>
