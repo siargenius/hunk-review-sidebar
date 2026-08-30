@@ -2,25 +2,22 @@ import type {
   ExtensionCommand,
   ExtensionCommandContext,
   ExtensionCommandHandler,
-  ExtensionLineHighlightTone,
   ExtensionPaneControls,
   HunkExtensionAPI,
 } from "hunkdiff/extension";
 import { hideFullyReviewedFiles } from "./src/hide.ts";
-import { reviewedHunkMarks } from "./src/highlights.ts";
+import { resolveReviewedTone, reviewedHunkMarks } from "./src/highlights.ts";
 import { noteCommandControls } from "./src/host.ts";
 import { findUnreviewedHunk } from "./src/nav.ts";
 import { ReviewedFilesPane } from "./src/pane.tsx";
 import * as store from "./src/store.ts";
 
-const TONES: readonly ExtensionLineHighlightTone[] = [
-  "match",
-  "current",
-  "info",
-  "warning",
-  "error",
-];
 const HIGHLIGHTER_ID = "reviewed";
+
+// modem-dev/hunk#909 added the "dim" line-highlight tone at extension
+// apiVersion 11 (hunkdiff ≥ 0.21). The published type package still types
+// apiVersion as a literal, hence the numeric cast.
+const DIM_TONE_API_VERSION = 11;
 
 /**
  * Keep the review tree out of the way until there is progress to track. The
@@ -40,12 +37,10 @@ function syncFilesPane(panes: ExtensionPaneControls): void {
 }
 
 export default function (hunk: HunkExtensionAPI) {
-  const configuredTone = hunk.config.reviewedTone;
-  const tone: ExtensionLineHighlightTone = TONES.includes(
-    configuredTone as ExtensionLineHighlightTone,
-  )
-    ? (configuredTone as ExtensionLineHighlightTone)
-    : "info";
+  const tone = resolveReviewedTone(
+    hunk.config.reviewedTone,
+    (hunk.apiVersion as number) >= DIM_TONE_API_VERSION,
+  );
   store.setHideReviewedFiles(hunk.config.hideReviewedFiles === true);
 
   // Pane components receive no command controls of their own, so every

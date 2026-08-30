@@ -69,8 +69,10 @@ and rebind:
 - **Click to jump, `x` to mark**: clicking a file or hunk row jumps the
   review stream to it, so the usual `x`/`X` toggles then mark exactly what
   you clicked.
-- **Diffs**: every line of a reviewed hunk is painted with a full-line
-  highlight in the configured tone.
+- **Diffs**: reviewed hunks are *dimmed* — the text recedes toward its
+  background while syntax-highlighting hues stay intact (Hunk ≥ 0.21,
+  extension apiVersion 11). On older Hunk versions they get the original
+  full-line background highlight in the configured tone instead.
 - **Hide reviewed files**: the Review pane has a clickable `☐ Hide reviewed
   files` checkbox under its header. While it's checked, fully-reviewed files
   are filtered out of the changeset (the click triggers a refresh for you).
@@ -83,13 +85,19 @@ and rebind:
 
 ```toml
 [extension.mark-as-reviewed]
-# Tone used to paint reviewed hunks.
-# One of: "match" | "current" | "info" | "warning" | "error"
-reviewedTone = "info"
+# Tone used to paint reviewed hunks. "dim" fades the text itself toward
+# the background (Hunk ≥ 0.21); the rest are background-highlight tones.
+# One of: "dim" | "match" | "current" | "info" | "warning" | "error"
+# Default: "dim" where supported, "info" on older Hunk versions.
+# reviewedTone = "dim"
 
 # Start every session with fully-reviewed files hidden.
 hideReviewedFiles = false
 ```
+
+Setting any classic tone (`"info"`, `"warning"`, …) forces the v1
+background-highlight look even on new Hunk versions; setting `"dim"` on an
+old Hunk version safely degrades to `"info"`.
 
 ## Development
 
@@ -105,7 +113,7 @@ follows the `hunk-*` convention.
 
 ## Roadmap
 
-- A custom file view that renders reviewed hunks dimmed (~50%) with
-  user-configurable colors, and can collapse reviewed hunks to a summary row
-  ("hide reviewed hunks" within a file).
+- A custom file view that can collapse reviewed hunks to a summary row
+  ("hide reviewed hunks" within a file). True dimming shipped in 0.2.0 via
+  Hunk's `"dim"` line-highlight tone.
 - Optional cross-session persistence of reviewed state.

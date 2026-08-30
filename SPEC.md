@@ -4,7 +4,9 @@ A Hunk extension that lets you mark hunks (and whole files) as reviewed while
 working through a diff, see review progress in the file list, visually mute
 reviewed hunks, and optionally hide them.
 
-Target API: `hunkdiff/extension` **apiVersion 8** (Hunk ≥ 0.19).
+Target API: `hunkdiff/extension` **apiVersion 8** (Hunk ≥ 0.19), with an
+opportunistic branch on **apiVersion 11** (Hunk ≥ 0.21) for the `"dim"`
+line-highlight tone (§5).
 
 ---
 
@@ -44,7 +46,11 @@ Target API: `hunkdiff/extension` **apiVersion 8** (Hunk ≥ 0.19).
    next-unreviewed-hunk navigation.
 5. **Line highlighters paint background tints from a fixed tone palette**
    (`match`, `current`, `info`, `warning`, `error`) — they cannot dim text to
-   50%. True dimming needs a custom file view (stretch).
+   50%. **Superseded in 0.2.0:** modem-dev/hunk#909 added a `"dim"` tone
+   (extension apiVersion 11, hunkdiff ≥ 0.21) that recedes text toward its
+   background while preserving token hues. We use it when the host's
+   `hunk.apiVersion ≥ 11` and fall back to the background tones below it;
+   a custom file view remains the stretch path only for *collapsing* hunks.
 6. **Themes have a fixed token set**; an extension cannot add a "reviewed"
    theme token. User theming of the reviewed style goes through
    `[extension.mark-as-reviewed]` config keys (§6).
@@ -177,7 +183,7 @@ features are wanted later.
 
 ## 5. Reviewed-hunk styling
 
-### v1 (MVP): line highlighter
+### v1 (MVP): line highlighter with background tone
 
 `hunk.registerLineHighlighter({ id: "reviewed", ... })` marks every line of
 every reviewed hunk (full-line character ranges, `side: "new"` + context
@@ -188,16 +194,27 @@ lines on both sides as addressed) with a configurable **tone**
 This gives a visible "done" background band, not a 50% dim — that's the
 palette's ceiling.
 
-### v2 (stretch): custom file view for true dimming
+### v1.1 (shipped in 0.2.0): `"dim"` tone with version fallback
 
-A `registerFileView` implementation that renders the raw diff itself but
-paints reviewed-hunk rows at ~50% opacity (blend fg toward bg), reading
-colors from `[extension.mark-as-reviewed]` config so users can theme it.
-Selectable from the View menu; raw diff remains the fallback. This also
-unlocks "hide reviewed hunks" (collapse them to a one-line summary row,
-subject to the `hunkRows` one-entry-per-parsed-hunk contract).
+modem-dev/hunk#909 added a `"dim"` tone at extension apiVersion 11
+(hunkdiff ≥ 0.21): the host blends each syntax token's foreground toward
+the line's effective background with a minimum-contrast floor — true
+dimming through the same mark delivery mechanism, no custom file view
+needed. The entry resolves the tone at load: `hunk.apiVersion ≥ 11`
+defaults to `"dim"`, older hosts keep `"info"`; an explicit `reviewedTone`
+config always wins (a configured `"dim"` on an old host degrades to
+`"info"`). The published type package predates the tone, so `"dim"` rides
+as a local `ReviewedTone` union extension with narrowing casts until
+devDependencies can track hunkdiff ≥ 0.21.
 
-**Theming commitment for v1:** the tone is user-configurable; document the
+### v2 (stretch): custom file view for collapsing hunks
+
+A `registerFileView` implementation that renders the raw diff itself,
+unlocking "hide reviewed hunks" (collapse them to a one-line summary row,
+subject to the `hunkRows` one-entry-per-parsed-hunk contract). True dimming
+no longer needs it (§ v1.1).
+
+**Theming commitment:** the tone is user-configurable; document the
 config knob and the future file view in the README.
 
 ---
@@ -206,9 +223,11 @@ config knob and the future file view in the README.
 
 ```toml
 [extension.mark-as-reviewed]
-# Tone used by the line highlighter for reviewed hunks.
-# One of: "match" | "current" | "info" | "warning" | "error"
-reviewedTone = "info"
+# Tone used by the line highlighter for reviewed hunks. "dim" needs
+# Hunk ≥ 0.21 (apiVersion 11) and degrades to "info" below it.
+# One of: "dim" | "match" | "current" | "info" | "warning" | "error"
+# Default: "dim" where supported, "info" otherwise.
+# reviewedTone = "dim"
 
 # Start sessions with reviewed files hidden.
 hideReviewedFiles = false
@@ -302,8 +321,9 @@ the `hunk-mark-as-reviewed` id + updated docs if either fails):
   `hunk:files`.
 - **M3 — line highlighter** for reviewed hunks + config knob.
 - **M4 — hide-reviewed-files** toggle via transform + refresh.
-- **M5 (stretch) — custom file view:** 50% dim, themeable colors, collapse
-  reviewed hunks. Separable follow-up release.
+- **M5 (stretch) — custom file view:** collapse reviewed hunks to a summary
+  row. (The 50%-dim goal shipped in 0.2.0 via the upstream `"dim"` tone.)
+  Separable follow-up release.
 
 ## Decisions (locked)
 

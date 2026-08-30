@@ -6,6 +6,42 @@ import type {
 } from "hunkdiff/extension";
 
 /**
+ * The tones this extension paints with. "dim" (modem-dev/hunk#909, extension
+ * apiVersion 11, hunkdiff ≥ 0.21) isn't in the published type package yet,
+ * so it rides along as a local extension of the upstream union — the casts
+ * below and in the entry file can go once devDependencies track hunkdiff
+ * ≥ 0.21.
+ */
+export type ReviewedTone = ExtensionLineHighlightTone | "dim";
+
+const CLASSIC_TONES: readonly ExtensionLineHighlightTone[] = [
+  "match",
+  "current",
+  "info",
+  "warning",
+  "error",
+];
+
+/**
+ * Pick the tone reviewed hunks are painted with. An explicitly configured
+ * classic tone always wins. Otherwise prefer "dim" — text receding toward
+ * its background reads as "done", where a background band reads as
+ * "attention" — on hosts new enough to have it, falling back to the v1
+ * default "info" background on older ones. A configured "dim" on an old
+ * host degrades to "info" rather than an unknown-tone rejection.
+ */
+export function resolveReviewedTone(
+  configured: unknown,
+  supportsDim: boolean,
+): ReviewedTone {
+  if (configured === "dim") return supportsDim ? "dim" : "info";
+  if (CLASSIC_TONES.includes(configured as ExtensionLineHighlightTone)) {
+    return configured as ExtensionLineHighlightTone;
+  }
+  return supportsDim ? "dim" : "info";
+}
+
+/**
  * Parse a file's unified diff into per-side line text lengths, addressed the
  * way line-highlight marks are: 1-based source line numbers on each side.
  * Mark ranges must be in bounds of the raw line text, so the highlighter
@@ -62,7 +98,7 @@ export function patchLineLengths(patch: string): {
 export function reviewedHunkMarks(
   file: ExtensionDiffFile,
   reviewedHunks: readonly ExtensionDiffHunk[],
-  tone: ExtensionLineHighlightTone,
+  tone: ReviewedTone,
 ): readonly ExtensionLineHighlight[] | null {
   if (reviewedHunks.length === 0) return null;
   const lengths = patchLineLengths(file.patch);
@@ -86,7 +122,14 @@ export function reviewedHunkMarks(
       for (let line = range[0]; line <= range[1]; line++) {
         const length = map.get(line);
         if (length !== undefined && length > 0) {
-          marks.push({ side, line, range: [0, length], tone });
+          // Narrowing cast: "dim" is only ever passed when the host's
+          // apiVersion says it understands it (see the entry file).
+          marks.push({
+            side,
+            line,
+            range: [0, length],
+            tone: tone as ExtensionLineHighlightTone,
+          });
         }
       }
     }

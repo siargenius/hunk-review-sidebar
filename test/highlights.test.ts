@@ -1,7 +1,11 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { ExtensionDiffFile, ExtensionDiffHunk } from "hunkdiff/extension";
-import { patchLineLengths, reviewedHunkMarks } from "../src/highlights.ts";
+import {
+  patchLineLengths,
+  resolveReviewedTone,
+  reviewedHunkMarks,
+} from "../src/highlights.ts";
 
 const PATCH = `diff --git a/a.ts b/a.ts
 index 1111111..2222222 100644
@@ -73,4 +77,24 @@ test("reviewedHunkMarks paints full-line ranges on both sides", () => {
 
 test("reviewedHunkMarks returns null with nothing reviewed", () => {
   assert.equal(reviewedHunkMarks(file(PATCH), [], "info"), null);
+});
+
+test("resolveReviewedTone prefers dim on hosts that support it", () => {
+  assert.equal(resolveReviewedTone(undefined, true), "dim");
+  assert.equal(resolveReviewedTone(undefined, false), "info");
+});
+
+test("resolveReviewedTone honors an explicit classic tone on any host", () => {
+  assert.equal(resolveReviewedTone("warning", true), "warning");
+  assert.equal(resolveReviewedTone("warning", false), "warning");
+});
+
+test("resolveReviewedTone degrades a configured dim on old hosts", () => {
+  assert.equal(resolveReviewedTone("dim", true), "dim");
+  assert.equal(resolveReviewedTone("dim", false), "info");
+});
+
+test("resolveReviewedTone falls back on unknown config values", () => {
+  assert.equal(resolveReviewedTone("bogus", true), "dim");
+  assert.equal(resolveReviewedTone("bogus", false), "info");
 });

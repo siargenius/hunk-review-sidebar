@@ -1,5 +1,11 @@
 # Draft issue for modem-dev/hunk
 
+> **Resolved:** filed as modem-dev/hunk#852 and shipped by
+> [modem-dev/hunk#909](https://github.com/modem-dev/hunk/pull/909) — the
+> `"dim"` line-highlight tone, available from extension apiVersion 11
+> (hunkdiff ≥ 0.21). This extension uses it since 0.2.0, with a fallback to
+> background tones on older Hunk versions.
+
 **Title:** Line highlighters: a "dim" treatment for diff text (foreground-side control)
 
 ---
