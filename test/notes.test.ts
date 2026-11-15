@@ -91,4 +91,8 @@ test("hunk labels contain only range metadata", async () => {
   assert.equal(hunkLabel("@@ -0,0 +1,28 @@"), "@@ -0,0 +1,28 @@");
   assert.equal(hunkLabel("@@@ -1,2 -3,4 +5,6 @@@ context"), "@@@ -1,2 -3,4 +5,6 @@@");
   assert.equal(hunkLabel("function render()"), "@@");
+  const narrow = hunkLabel("@@ -128,123 +133,456 @@ function render()", 19);
+  assert.ok(narrow.length <= 19);
+  assert.match(narrow, /^@@ -.* \+.* @@$/);
+
 });

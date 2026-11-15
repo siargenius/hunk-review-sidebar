@@ -97,16 +97,15 @@ function FileRow({ file, selected, width, theme, onSelect }: FileRowProps) {
       ? theme.accent
       : theme.muted;
   const truncated = file.statsTruncated ? "+" : "";
-  const stats =
-    file.stats.additions + file.stats.deletions > 0
-      ? `+${file.stats.additions}${truncated} -${file.stats.deletions}${truncated}`
-      : "";
+  const additions = file.stats.additions > 0 ? `+${file.stats.additions}${truncated}` : "";
+  const deletions = file.stats.deletions > 0 ? `-${file.stats.deletions}${truncated}` : "";
   const count =
     progress.total > 0 && !done
       ? `(${progress.reviewed}/${progress.total})`
       : "";
   const notes = notesFor(file).length;
-  const right = [stats, count, notes > 0 ? `${notes}n` : ""].filter(Boolean).join(" ");
+  const noteCount = notes > 0 ? `*${notes}` : "";
+  const right = [count, noteCount, additions, deletions].filter(Boolean).join(" ");
   // Left fixed cells: " ☐ M " — checkbox and status letter.
   const nameMax = Math.max(1, width - right.length - 6);
   const name = truncateMiddle(splitPath(file.path).base, nameMax);
@@ -134,14 +133,14 @@ function FileRow({ file, selected, width, theme, onSelect }: FileRowProps) {
         />
       </box>
       <box style={{ flexDirection: "row", height: 1 }}>
-        {stats && <>
-          <text content={`+${file.stats.additions}${truncated}`} style={{ fg: theme.badgeAdded }} />
-          <text content={` -${file.stats.deletions}${truncated}`} style={{ fg: theme.badgeRemoved }} />
-        </>}
-        <text
-          content={`${stats && (count || notes) ? " " : ""}${[count, notes > 0 ? `${notes}n` : ""].filter(Boolean).join(" ")} `}
-          style={{ fg: theme.muted }}
-        />
+        {[
+          { text: count, color: theme.muted },
+          { text: noteCount, color: theme.muted },
+          { text: additions, color: theme.badgeAdded },
+          { text: deletions, color: theme.badgeRemoved },
+        ].filter(item => item.text).map((item, index) => (
+          <text key={index} content={`${item.text} `} style={{ fg: item.color }} />
+        ))}
       </box>
     </box>
   );
@@ -170,7 +169,7 @@ function HunkRow({
   // Leading indent + checkbox + ordinal ("   ☐ 12. ").
   const prefix = `   ${check} ${ordinal} `;
   const labelMax = Math.max(1, width - prefix.length - 1);
-  const label = truncateMiddle(hunkLabel(hunk.header), labelMax);
+  const label = hunkLabel(hunk.header, labelMax);
   return (
     <box
       id={`row-${file.id}:h${hunk.index}`}
@@ -186,12 +185,16 @@ function HunkRow({
         content={`   ${check} `}
         style={{ fg: reviewed ? theme.badgeAdded : theme.muted }}
       />
-      <text
-        content={`${ordinal} ${label}`}
-        style={{
-          fg: selected ? theme.accent : reviewed ? theme.muted : theme.text,
-        }}
-      />
+      <box style={{ flexDirection: "row", height: 1 }}>
+        <text content={`${ordinal} `} style={{ fg: selected ? theme.accent : reviewed ? theme.muted : theme.text }} />
+        {label.split(/([+-][\d,…]+)/).filter(Boolean).map((part, index) => (
+          <text
+            key={index}
+            content={part}
+            style={{ fg: part.startsWith("+") ? theme.badgeAdded : part.startsWith("-") ? theme.badgeRemoved : selected ? theme.accent : reviewed ? theme.muted : theme.text }}
+          />
+        ))}
+      </box>
     </box>
   );
 }
