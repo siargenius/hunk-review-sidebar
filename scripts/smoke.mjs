@@ -51,7 +51,7 @@ try {
   const row = term.buffer.active.getLine(fileRow);
   const rowText = row.translateToString();
   assert.notEqual(row.getCell(rowText.indexOf('+1')).getFgColor(), row.getCell(rowText.indexOf('-1')).getFgColor(), 'addition and deletion counts use distinct colors');
-  assert.match(rowText.slice(0, 34), /● \+1 -1/);
+  assert.match(rowText.slice(0, 34), /● \+1 -1 \(0\/1\)\s*$/);
   assert.ok(!rowText.slice(0, 34).includes("*1"));
   assert.ok(!rowText.slice(0, 34).includes('1n'));
   const hunkRowIndex = screen().split('\n').findIndex(line => line.slice(0, 34).includes('@@ -1 +1 @@'));

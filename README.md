@@ -17,7 +17,7 @@ File rows show change type, additions, deletions, review progress, and a dot whe
 Each thread appears beneath its hunk as a compact note count and latest author.
 Your replies show `You`. Separate threads keep separate rows, even at the same source line.
 Hunk rows show only `@@` range metadata, without trailing code context.
-Note previews stay in the main review stream. The note dot precedes addition and deletion counts. Zero change counts are omitted.
+Note previews stay in the main review stream. The note dot precedes addition and deletion counts. Review progress sits at the far right. Zero change counts are omitted.
 Addition counts and hunk ranges are green. Deletion counts and hunk ranges are red.
 Hunk supplies saved user notes, live agent comments, and sidecar annotations with each visible file.
 Note edits and removals appear through the same file props used by Hunk's built-in file list.
