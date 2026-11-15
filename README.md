@@ -45,7 +45,7 @@ hunk extension remove hunk-mark-as-reviewed
 hunk extension install siargenius/hunk-review-sidebar
 ```
 
-Both versions use the same `mark-as-reviewed` extension id, configuration table, and marking keys.
+Both versions bind the same marking keys and replace the files pane. Run one version at a time.
 Restart Hunk after installation. Existing sessions keep their loaded extension code.
 
 To try a checkout for one run:
@@ -63,7 +63,9 @@ The pane shows thread metadata. Note text and rich markup remain in Hunk's main 
 Hunk retains note editing and deletion in the main review stream.
 
 Reviewed marks last for the session. Soft reloads preserve marks whose upstream identity still matches.
-The existing `[extension.mark-as-reviewed]` settings and command ids still apply.
+The installed extension id is `hunk-review-sidebar`. Its settings use `[extension.hunk-review-sidebar]`.
+Commands use that prefix too, such as `hunk-review-sidebar.toggleHunk`.
+When loading `mark-as-reviewed.tsx` directly from a checkout, the id remains `mark-as-reviewed`.
 
 ## Development
 
@@ -88,7 +90,7 @@ The progress bridge writes a local JSON summary for tools that consume review st
 It is disabled by default. To enable it, add this to your Hunk configuration:
 
 ```toml
-[extension.mark-as-reviewed]
+[extension.hunk-review-sidebar]
 progressBridge = true
 ```
 
