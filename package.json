@@ -13,7 +13,8 @@
   "scripts": {
     "typecheck": "tsc --noEmit",
     "test": "node --test \"test/*.test.ts\"",
-    "test:integration": "node scripts/smoke.mjs"
+    "test:integration": "node scripts/smoke.mjs",
+    "test:rename": "node scripts/rename-smoke.mjs"
   },
   "devDependencies": {
     "@opentui/core": "*",

@@ -62,6 +62,9 @@ Drafts and orphaned notes without a visible file do not appear in this list.
 The pane shows thread metadata. Note text and rich markup remain in Hunk's main review stream.
 Hunk retains note editing and deletion in the main review stream.
 
+Pure renames with no text hunks count as reviewed automatically, including after clearing manual marks.
+Renames with text changes, binary changes, and skipped files still need manual review.
+
 Reviewed marks last for the session. Soft reloads preserve marks whose upstream identity still matches.
 The installed extension id is `hunk-review-sidebar`. Its settings use `[extension.hunk-review-sidebar]`.
 Commands use that prefix too, such as `hunk-review-sidebar.toggleHunk`.

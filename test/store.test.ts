@@ -158,3 +158,37 @@ test("subscribers are notified on change with a fresh state reference", () => {
   toggleHunk("a.ts", hunk(1));
   assert.equal(calls, 1);
 });
+
+test("pure renames without text hunks count as reviewed automatically", () => {
+  const renamed = { ...file("quantity.py", []), changeType: "rename-pure" as const,
+    previousPath: "old_quantity.py", stats: { additions: 0, deletions: 0 } };
+  const edited = file("edited.py", [hunk(0)]);
+  noteFiles([renamed, edited]);
+  toggleFile(edited);
+  assert.equal(isFileFullyReviewed(renamed), true);
+  assert.equal(isPathFullyReviewed(renamed.path), true);
+  assert.deepEqual(totalProgress([renamed, edited]), { reviewed: 2, total: 2 });
+  resetReviewed();
+  assert.equal(isFileFullyReviewed(renamed), true);
+});
+
+
+test("automatic rename review survives filtering and stops when text changes", () => {
+  const renamed = { ...file("quantity.py", []), changeType: "rename-pure" as const };
+  noteFiles([renamed]);
+  setHideReviewedFiles(true);
+  noteFiles([]);
+  assert.equal(isPathFullyReviewed(renamed.path), true);
+  assert.equal(toggleFile(renamed), true);
+  const changed = { ...renamed, changeType: "rename-changed" as const, hunks: [hunk(0)] };
+  noteFiles([changed]);
+  assert.equal(isFileFullyReviewed(changed), false);
+  assert.equal(isPathFullyReviewed(changed.path), false);
+});
+
+test("binary and skipped changes remain manual, including changed renames without hunks", () => {
+  for (const changeType of ["change", "rename-changed", "new", "deleted"] as const) {
+    const f = { ...file("binary.dat", []), changeType };
+    assert.equal(isFileFullyReviewed(f), false);
+  }
+});

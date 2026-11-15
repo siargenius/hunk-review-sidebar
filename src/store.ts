@@ -30,12 +30,12 @@ let state: ReviewStoreState = {
 };
 
 /**
- * Hunk summaries from the most recent `changeset_loaded`, keyed by path.
+ * File facts from `changeset_loaded`, keyed by path.
  * Transform callbacks receive files without `hunks` (they are derived at the
  * read-only boundary), so "is this path fully reviewed" during a transform
  * has to be answered from the last event payload instead.
  */
-let knownHunks: ReadonlyMap<string, readonly ExtensionDiffHunk[]> = new Map();
+let knownFiles: ReadonlyMap<string, ExtensionDiffFile> = new Map();
 
 /** Files of the most recent `changeset_loaded`, for cross-file navigation. */
 let latestFiles: readonly ExtensionDiffFile[] = [];
@@ -105,7 +105,12 @@ export interface FileProgress {
 export function hunksFor(
  file: ExtensionDiffFile,
 ): readonly ExtensionDiffHunk[] {
- return file.hunks ?? knownHunks.get(file.path) ?? [];
+ return file.hunks ?? knownFiles.get(file.path)?.hunks ?? [];
+}
+
+/** Pure renames have no changed text to review. Other hunk-less changes stay manual. */
+export function isAutomaticallyReviewed(file: ExtensionDiffFile): boolean {
+ return file.changeType === "rename-pure" && hunksFor(file).length === 0;
 }
 
 export function fileProgress(file: ExtensionDiffFile): FileProgress {
@@ -114,7 +119,7 @@ export function fileProgress(file: ExtensionDiffFile): FileProgress {
   return {
    reviewed: 0,
    total: 0,
-   fileReviewed: state.reviewed.has(fileKey(file.path)),
+   fileReviewed: isAutomaticallyReviewed(file) || state.reviewed.has(fileKey(file.path)),
   };
  }
  let reviewed = 0;
@@ -135,7 +140,9 @@ export function isFileFullyReviewed(file: ExtensionDiffFile): boolean {
  * where files carry no `hunks`). Falls back to the last `noteFiles` record.
  */
 export function isPathFullyReviewed(path: string): boolean {
- const hunks = knownHunks.get(path);
+ const known = knownFiles.get(path);
+ if (known && isAutomaticallyReviewed(known)) return true;
+ const hunks = known?.hunks;
  if (!hunks || hunks.length === 0) return state.reviewed.has(fileKey(path));
  return hunks.every((hunk) => state.reviewed.has(hunkKey(path, hunk)));
 }
@@ -157,6 +164,7 @@ export function toggleHunk(path: string, hunk: ExtensionDiffHunk): boolean {
  * reviewed flag.
  */
 export function toggleFile(file: ExtensionDiffFile): boolean {
+ if (isAutomaticallyReviewed(file)) return true;
  const hunks = hunksFor(file);
  const next = new Set(state.reviewed);
  const fullyReviewed = isFileFullyReviewed(file);
@@ -188,7 +196,10 @@ export function setHideReviewedFiles(hide: boolean): void {
 /** Record the file list of a freshly loaded changeset. */
 export function noteFiles(files: readonly ExtensionDiffFile[]): void {
  latestFiles = files;
- knownHunks = new Map(files.map((file) => [file.path, file.hunks ?? []]));
+ // Keep filtered files available to subsequent transforms while hiding is enabled.
+ const next = state.hideReviewedFiles ? new Map(knownFiles) : new Map<string, ExtensionDiffFile>();
+ for (const file of files) next.set(file.path, file);
+ knownFiles = next;
 }
 
 /** Files of the most recent `changeset_loaded` (post-transform). */
