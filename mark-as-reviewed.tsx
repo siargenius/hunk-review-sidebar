@@ -1,13 +1,11 @@
+import { installReviewBridge } from "./src/review-progress-bridge.ts";
 import type {
-  ExtensionCommand,
   ExtensionCommandContext,
-  ExtensionCommandHandler,
-  ExtensionPaneControls,
   HunkExtensionAPI,
 } from "hunkdiff/extension";
 import { hideFullyReviewedFiles } from "./src/hide.ts";
 import { resolveReviewedTone, reviewedHunkMarks } from "./src/highlights.ts";
-import { noteCommandControls } from "./src/host.ts";
+import { noteReloadControls } from "./src/host.ts";
 import { findUnreviewedHunk } from "./src/nav.ts";
 import { ReviewedFilesPane } from "./src/pane.tsx";
 import * as store from "./src/store.ts";
@@ -19,23 +17,6 @@ const HIGHLIGHTER_ID = "reviewed";
 // apiVersion as a literal, hence the numeric cast.
 const DIM_TONE_API_VERSION = 11;
 
-/**
- * Keep the review tree out of the way until there is progress to track. The
- * first mark opens it (closing the built-in file list so the two never
- * compete for sidebar width, and revealing a hidden sidebar); returning to
- * zero marks closes it and restores the built-in. `s` / View → Files only
- * ever toggles the built-in list — the tree's visibility is mark-driven only.
- */
-function syncFilesPane(panes: ExtensionPaneControls): void {
-  if (store.getState().reviewed.size > 0) {
-    panes.close("hunk:files");
-    panes.open("review");
-  } else {
-    panes.close("review");
-    panes.open("hunk:files");
-  }
-}
-
 export default function (hunk: HunkExtensionAPI) {
   const tone = resolveReviewedTone(
     hunk.config.reviewedTone,
@@ -43,22 +24,13 @@ export default function (hunk: HunkExtensionAPI) {
   );
   store.setHideReviewedFiles(hunk.config.hideReviewedFiles === true);
 
-  // Pane components receive no command controls of their own, so every
-  // command registration goes through this wrapper to stash the handler's
-  // controls — the pane's hide checkbox refreshes through them (host.ts).
-  const command = (
-    definition: ExtensionCommand,
-    handler: ExtensionCommandHandler,
-  ): void =>
-    hunk.registerCommand(definition, (ctx) => {
-      noteCommandControls(ctx.commands);
-      return handler(ctx);
-    });
+  const command = hunk.registerCommand.bind(hunk);
 
   // The most recent (post-transform) changeset lives in the store — a
   // command's selection only names the current file, so walking across file
   // boundaries needs the visible list from the last load event.
   hunk.on("changeset_loaded", ({ changeset }, ctx) => {
+    noteReloadControls(ctx.review);
     store.noteFiles(changeset.files);
     const dropped = store.reconcile(changeset.files);
     if (dropped > 0) {
@@ -67,9 +39,8 @@ export default function (hunk: HunkExtensionAPI) {
         "warning",
       );
     }
-    // Marks survive soft reloads, so this also restores the tree after one.
-    syncFilesPane(ctx.panes);
   });
+  hunk.on("session_reload", (_event, ctx) => noteReloadControls(ctx.review));
 
   // --- Marking -----------------------------------------------------------
 
@@ -85,7 +56,6 @@ export default function (hunk: HunkExtensionAPI) {
         return;
       }
       const reviewed = store.toggleHunk(file.path, hunk0);
-      syncFilesPane(ctx.panes);
       ctx.highlights.refresh(HIGHLIGHTER_ID, { fileId: file.id });
       const progress = store.fileProgress(file);
       ctx.notify(
@@ -103,7 +73,6 @@ export default function (hunk: HunkExtensionAPI) {
         return;
       }
       const reviewed = store.toggleFile(file);
-      syncFilesPane(ctx.panes);
       ctx.highlights.refresh(HIGHLIGHTER_ID, { fileId: file.id });
       ctx.notify(
         reviewed
@@ -115,7 +84,6 @@ export default function (hunk: HunkExtensionAPI) {
 
   command({ id: "resetReview", title: "Clear all reviewed marks" }, (ctx) => {
     store.resetReviewed();
-    syncFilesPane(ctx.panes);
     ctx.highlights.refresh(HIGHLIGHTER_ID);
     ctx.notify("Cleared all reviewed marks");
   });
@@ -161,14 +129,10 @@ export default function (hunk: HunkExtensionAPI) {
 
   // --- Presentation ----------------------------------------------------------
 
-  // A standalone pane, deliberately NOT `replaces: "hunk:files"`: the host's
-  // files-slot toggle falls back to the replacement key whenever nothing is
-  // open, so a replacement stays reachable via `s` even with zero marks. As
-  // our own pane, `s` never touches us — visibility is purely mark-driven
-  // through syncFilesPane.
   hunk.registerPane({
     id: "review",
     title: "Review",
+    replaces: "hunk:files",
     component: ReviewedFilesPane,
   });
 
@@ -181,4 +145,6 @@ export default function (hunk: HunkExtensionAPI) {
       return reviewedHunkMarks(file, reviewed, tone);
     },
   });
+  installReviewBridge(hunk, store);
+
 }

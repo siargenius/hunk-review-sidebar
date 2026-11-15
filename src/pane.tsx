@@ -7,6 +7,7 @@ import type {
   ExtensionPaneProps,
   ExtensionPaneTheme,
 } from "hunkdiff/extension";
+import { notesFor, noteSource, noteText, revealNote } from "./notes.ts";
 import { toggleHideReviewedFiles } from "./hide.ts";
 import {
   fileProgress,
@@ -16,6 +17,7 @@ import {
   isHunkReviewed,
   subscribe,
   totalProgress,
+  toggleSection,
 } from "./store.ts";
 
 function truncateMiddle(text: string, max: number): string {
@@ -101,7 +103,8 @@ function FileRow({ file, selected, width, theme, onSelect }: FileRowProps) {
     progress.total > 0 && !done
       ? `(${progress.reviewed}/${progress.total})`
       : "";
-  const right = [stats, count].filter(Boolean).join(" ");
+  const notes = notesFor(file).length;
+  const right = [stats, count, notes > 0 ? `${notes}n` : ""].filter(Boolean).join(" ");
   // Left fixed cells: " ☐ M " — checkbox and status letter.
   const nameMax = Math.max(1, width - right.length - 6);
   const name = truncateMiddle(splitPath(file.path).base, nameMax);
@@ -187,38 +190,25 @@ function HunkRow({
   );
 }
 
-/**
- * The "Review" pane: a tree of directories, files, and their hunks, shown
- * in place of the built-in file list while any mark exists (the entry point
- * swaps the two via open/close; with zero marks only the built-in list is
- * around and `s` toggles it alone). The layout mirrors the built-in list's
- * simplicity — a dimmed directory header, then one row per file with a
- * colored status letter and right-aligned +/- stats — with hunks nested one
- * level deeper. Every row leads with a unicode checkbox: `▣` reviewed, `◧`
- * partially reviewed (files only), `☐` not reviewed. In-progress files also
- * keep a `(n/total)` count beside their stats. Hunk rows jump the review
- * stream to the hunk on click, so the global `x`/`X` toggles then act on
- * what was clicked. The header row counts the whole changeset; beneath it
- * sits a clickable "Hide reviewed files" checkbox — the only surface that
- * both shows and flips that mode, since extension menu entries can't carry
- * a live check state.
- */
+/** Files, hunk progress, and saved notes in one replacement pane. */
 export function ReviewedFilesPane(props: ExtensionPaneProps) {
   // Subscribe to the module-level review store so toggles rerender the list
   // even though they happen outside React.
   const state = useSyncExternalStore(subscribe, getState);
+  const { showChanges, showNotes } = state;
   const scrollRef = useRef<ScrollBoxRenderable | null>(null);
   useEffect(() => {
     if (props.selectedFileId === null) return;
     const id =
-      props.selectedHunkIndex === null
+      props.selectedHunkIndex === null || !showChanges
         ? `row-${props.selectedFileId}`
         : `row-${props.selectedFileId}:h${props.selectedHunkIndex}`;
     scrollRef.current?.scrollChildIntoView(id);
-  }, [props.selectedFileId, props.selectedHunkIndex]);
+  }, [props.selectedFileId, props.selectedHunkIndex, showChanges]);
   const totals = totalProgress(props.files);
   const allReviewed = totals.total > 0 && totals.reviewed === totals.total;
-  const summary = ` ${totals.reviewed}/${totals.total} reviewed`;
+  const noteCount = props.files.reduce((count, file) => count + notesFor(file).length, 0);
+  const summary = ` ${totals.reviewed}/${totals.total} reviewed · ${noteCount} ${noteCount === 1 ? "note" : "notes"}`;
   const hideCheck = state.hideReviewedFiles ? CHECK_DONE : CHECK_TODO;
   // Group files under a dimmed directory header, emitted whenever the
   // directory changes — the changeset arrives path-sorted, so siblings are
@@ -254,7 +244,7 @@ export function ReviewedFilesPane(props: ExtensionPaneProps) {
           theme={props.theme}
           onSelect={() => props.actions.selectFile(file.id)}
         />
-        {hunksFor(file).map((hunk) => (
+        {showChanges && hunksFor(file).map((hunk) => (
           <HunkRow
             key={hunk.index}
             file={file}
@@ -267,6 +257,22 @@ export function ReviewedFilesPane(props: ExtensionPaneProps) {
             theme={props.theme}
             onSelect={() => props.actions.selectHunk(file.id, hunk.index)}
           />
+        ))}
+        {showNotes && file.agent?.summary && (
+          <text content={`   ${file.agent.summary}`} style={{ fg: props.theme.muted, width: "100%" }} />
+        )}
+        {showNotes && notesFor(file).map((note, index) => (
+          <box
+            key={`${file.path}:note:${note.id ?? index}`}
+            style={{ width: "100%", flexDirection: "column", paddingLeft: 3, paddingRight: 1 }}
+            onMouseUp={() => revealNote(file, note, props.actions)}
+          >
+            <text
+              content={`● ${noteSource(note)}${note.newRange ? ` +${note.newRange[0]}` : note.oldRange ? ` -${note.oldRange[0]}` : ""}`}
+              style={{ fg: note.source === "user" ? props.theme.accent : props.theme.muted }}
+            />
+            <text content={noteText(note)} style={{ fg: props.theme.text, width: "100%" }} />
+          </box>
         ))}
       </box>,
     );
@@ -301,7 +307,19 @@ export function ReviewedFilesPane(props: ExtensionPaneProps) {
         />
         <text content="Hide reviewed files" style={{ fg: props.theme.text }} />
       </box>
-      {rows}
+      <box style={{ flexDirection: "row", height: 1, width: "100%" }}>
+        <text
+          content={` ${showChanges ? CHECK_DONE : CHECK_TODO} Changes `}
+          style={{ fg: props.theme.accent }}
+          onMouseUp={() => toggleSection("showChanges")}
+        />
+        <text
+          content={`${showNotes ? CHECK_DONE : CHECK_TODO} Notes`}
+          style={{ fg: props.theme.accent }}
+          onMouseUp={() => toggleSection("showNotes")}
+        />
+      </box>
+      {rows.length > 0 ? rows : <text content=" No visible files" style={{ fg: props.theme.muted }} />}
     </scrollbox>
   );
 }

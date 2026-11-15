@@ -1,119 +1,74 @@
-# hunk-mark-as-reviewed
+# Hunk review sidebar
 
-A [Hunk](https://hunk.dev) extension for marking your way through a review:
-mark hunks and files as reviewed, watch progress in the file list, mute what
-you've finished, and hide it when you don't want to see it again.
+A local fork of `evantravers/hunk-mark-as-reviewed` v0.2.0 for Hunk 0.24.1.
+One pane shows files, changes, saved notes, and review progress together.
 
-Reviewed state lives for the session — soft reloads (refresh, watch) keep it,
-quitting Hunk discards it. Marks survive reload renumbering: they are keyed by
-path + hunk header + line spans, and reconciled whenever the changeset
-reloads.
+## Use
 
-## Install
+- `x` marks the selected hunk. `X` marks its file.
+- `<` and `>` jump between unreviewed hunks.
+- `s` toggles the combined pane through Hunk's normal files-pane command.
+- Click a file or hunk to jump to it.
+- Click a note to reveal its source line. Notes without a range select their file.
+- Click Changes or Notes in the pane header to hide or show those rows.
+- Click Hide reviewed files to filter completed files and refresh the review.
+
+File rows show change type, additions, deletions, review progress, and note counts (`2n` means two notes).
+Notes show their author or source, source line, summary, and rationale.
+Hunk supplies saved user notes, live agent comments, and sidecar annotations with each visible file.
+Note edits and removals appear through the same file props used by Hunk's built-in file list.
+
+The pane replaces the `hunk:files` slot from startup, including before the first reviewed mark.
+Clearing marks and refreshing preserve the pane's open preference.
+Section preferences survive closing and reopening the pane during the session.
+The built-in pane remains available as Hunk's rendering fallback.
+
+## Installation on this machine
+
+The user configuration loads this checkout's `mark-as-reviewed.tsx`.
+The original managed installation is retained outside the extension discovery directory as a backup.
+Do not install both versions: they use the same `mark-as-reviewed` extension id and marking keys.
+
+To load this checkout for one run in a separate configuration:
 
 ```sh
-hunk extension install evantravers/hunk-mark-as-reviewed
+hunk diff --extension /path/to/hunk-review-sidebar/mark-as-reviewed.tsx
 ```
 
-Or load it for one run from a checkout:
+## Scope
 
-```sh
-hunk diff --extension /path/to/checkout/mark-as-reviewed.tsx
-```
+The list follows Hunk's visible files and their annotations.
+Files hidden by filters stay hidden, including their notes.
+Drafts and orphaned notes without a visible file do not appear in this list.
+The pane renders note text. Rich markup remains available in Hunk's main review stream.
+Hunk retains note editing and deletion in the main review stream.
 
-## Keys & commands
-
-| Key | Command | What it does |
-| --- | --- | --- |
-| `x` | `mark-as-reviewed.toggleHunk` | Toggle the current hunk reviewed/unreviewed |
-| `X` | `mark-as-reviewed.toggleFile` | Toggle every hunk in the current file (binary/skipped files toggle as a whole) |
-| `>` | `mark-as-reviewed.nextUnreviewed` | Jump to the next unreviewed hunk, across files, wrapping |
-| `<` | `mark-as-reviewed.prevUnreviewed` | Jump to the previous unreviewed hunk |
-| — | `mark-as-reviewed.resetReview` | Clear every reviewed mark |
-
-`>`/`<` are the shifted forms of Hunk's own `.`/`,` (next/previous file), so
-the mnemonic composes. Every command is rebindable in
-`~/.config/hunk/config.toml`:
-
-```toml
-[keybindings]
-"mark-as-reviewed.nextUnreviewed" = "]"
-"mark-as-reviewed.prevUnreviewed" = "["
-```
-
-### Prefer `r` / `R`?
-
-`r` ships as Hunk's refresh (`hunk.app.refresh`), and built-ins win default
-chords — that's why the defaults are `x`/`X`. To reclaim `r`/`R`, move refresh
-and rebind:
-
-```toml
-[keybindings]
-"hunk.app.refresh" = "ctrl+r"
-"mark-as-reviewed.toggleHunk" = "r"
-"mark-as-reviewed.toggleFile" = "R"
-```
-
-## What you see
-
-- **Review pane** (a file/hunk tree that swaps places with the built-in
-  file list once you start marking): every file expands into its hunks. File
-  rows keep their `+adds/-dels` badges and add a review badge — `(2/7)`
-  while a file is in progress, `☑` when every hunk is reviewed, `✓` for
-  hunk-less files marked whole. Hunk rows show the `@@` header and turn muted
-  with a `✓` once reviewed. A summary line at the top counts the whole
-  changeset and flags when reviewed files are being hidden. Until the first
-  hunk is marked — and again once every mark is cleared — only the plain
-  built-in file list is around, and `s` / View → Files toggles it alone; the
-  tree's visibility is driven purely by your marks.
-- **Click to jump, `x` to mark**: clicking a file or hunk row jumps the
-  review stream to it, so the usual `x`/`X` toggles then mark exactly what
-  you clicked.
-- **Diffs**: reviewed hunks are *dimmed* — the text recedes toward its
-  background while syntax-highlighting hues stay intact (Hunk ≥ 0.21,
-  extension apiVersion 11). On older Hunk versions they get the original
-  full-line background highlight in the configured tone instead.
-- **Hide reviewed files**: the Review pane has a clickable `☐ Hide reviewed
-  files` checkbox under its header. While it's checked, fully-reviewed files
-  are filtered out of the changeset (the click triggers a refresh for you).
-  If everything is reviewed, nothing is hidden — you get a toast instead of
-  an empty review. The checkbox lives in the pane rather than the Extensions
-  menu because extension menu entries can't show a live check state (Hunk
-  renders `[x]` only for its own built-in menu items).
-
-## Configuration
-
-```toml
-[extension.mark-as-reviewed]
-# Tone used to paint reviewed hunks. "dim" fades the text itself toward
-# the background (Hunk ≥ 0.21); the rest are background-highlight tones.
-# One of: "dim" | "match" | "current" | "info" | "warning" | "error"
-# Default: "dim" where supported, "info" on older Hunk versions.
-# reviewedTone = "dim"
-
-# Start every session with fully-reviewed files hidden.
-hideReviewedFiles = false
-```
-
-Setting any classic tone (`"info"`, `"warning"`, …) forces the v1
-background-highlight look even on new Hunk versions; setting `"dim"` on an
-old Hunk version safely degrades to `"info"`.
+Reviewed marks last for the session. Soft reloads preserve marks whose upstream identity still matches.
+The original progress bridge remains in place for existing consumers.
+The existing `[extension.mark-as-reviewed]` settings and command ids still apply.
 
 ## Development
 
 ```sh
-npm install
-npm run typecheck   # tsc --noEmit against hunkdiff/extension types
-npm test            # node --test over the pure logic (store, nav, highlights)
+npm ci
+npm run typecheck
+npm test
+npm run test:integration
 ```
 
-The extension id is `mark-as-reviewed` — it comes from the entry file's stem,
-not the repository name, so command ids stay short even though the repo
-follows the `hunk-*` convention.
+The terminal smoke test uses an isolated configuration, temporary repository, and private pseudoterminal.
+It checks initial notes, marking, sidebar toggling, reloads, and live comments.
+Set `HUNK_BIN` when Hunk is installed outside `/opt/homebrew/bin/hunk`.
+Some npm configurations skip dependency install scripts. On macOS, make node-pty's spawn helper executable before running integration tests.
 
-## Roadmap
+See [IMPLEMENTATION.md](IMPLEMENTATION.md) for the implementation plan.
+Upstream design notes remain in SPEC.md and UPSTREAM-ISSUE.md.
 
-- A custom file view that can collapse reviewed hunks to a summary row
-  ("hide reviewed hunks" within a file). True dimming shipped in 0.2.0 via
-  Hunk's `"dim"` line-highlight tone.
-- Optional cross-session persistence of reviewed state.
+## Local backup and rollback
+
+`LOCAL-INSTALL.json` records this machine's backup directory and active configuration.
+The backup contains the previous config, managed extension, and installation records.
+To roll back, restore `config.toml`, copy the backup extension into Hunk's managed install directory,
+and restore its entry in `records.json`. Reopen Hunk afterward.
+
+Use `HUNK_SMOKE_INSTALLED=1 npm run test:integration` to test discovery through the active user configuration.

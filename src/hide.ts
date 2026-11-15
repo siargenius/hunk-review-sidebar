@@ -1,5 +1,5 @@
 import type { ExtensionChangeset } from "hunkdiff/extension";
-import { executeHostCommand } from "./host.ts";
+import { refreshReview } from "./host.ts";
 import {
  getState,
  isPathFullyReviewed,
@@ -51,5 +51,7 @@ export function toggleHideReviewedFiles(notify: Notify): void {
  setHideReviewedFiles(hide);
  lastHidden = 0;
  notify(hide ? "Hiding fully-reviewed files" : "Showing reviewed files");
- executeHostCommand("hunk.app.refresh");
+ void refreshReview().then((ok) => {
+  if (!ok) notify("Refresh unavailable. Press the refresh key to update the file list.");
+ }).catch(() => notify("Refresh failed. Press the refresh key to try again."));
 }

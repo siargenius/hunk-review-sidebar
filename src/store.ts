@@ -15,6 +15,8 @@ import type { ExtensionDiffFile, ExtensionDiffHunk } from "hunkdiff/extension";
 export interface ReviewStoreState {
  readonly reviewed: ReadonlySet<string>;
  readonly hideReviewedFiles: boolean;
+ readonly showChanges: boolean;
+ readonly showNotes: boolean;
 }
 
 const FILE_PREFIX = "file";
@@ -23,6 +25,8 @@ const HUNK_PREFIX = "hunk";
 let state: ReviewStoreState = {
  reviewed: new Set<string>(),
  hideReviewedFiles: false,
+ showChanges: true,
+ showNotes: true,
 };
 
 /**
@@ -47,6 +51,10 @@ export function subscribe(listener: () => void): () => void {
 
 export function getState(): ReviewStoreState {
  return state;
+}
+
+export function toggleSection(section: "showChanges" | "showNotes"): void {
+ setState({ ...state, [section]: !state[section] });
 }
 
 function setState(next: ReviewStoreState): void {
