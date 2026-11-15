@@ -9,12 +9,15 @@ One pane shows files, changes, saved notes, and review progress together.
 - `<` and `>` jump between unreviewed hunks.
 - `s` toggles the combined pane through Hunk's normal files-pane command.
 - Click a file or hunk to jump to it.
-- Click a note to reveal its source line. Notes without a range select their file.
+- Click a thread row to reveal its source line. Notes without a range select their file.
 - Click Changes or Notes in the pane header to hide or show those rows.
 - Click Hide reviewed files to filter completed files and refresh the review.
 
 File rows show change type, additions, deletions, review progress, and note counts (`2n` means two notes).
-Notes show their author or source, source line, summary, and rationale.
+Each thread appears beneath its hunk as a compact note count and latest author.
+Your replies show `You`. Separate threads keep separate rows, even at the same source line.
+Hunk rows show only `@@` range metadata, without trailing code context.
+Note previews stay in the main review stream. Addition counts are green and deletion counts are red.
 Hunk supplies saved user notes, live agent comments, and sidecar annotations with each visible file.
 Note edits and removals appear through the same file props used by Hunk's built-in file list.
 

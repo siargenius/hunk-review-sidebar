@@ -7,7 +7,9 @@ import type {
   ExtensionPaneProps,
   ExtensionPaneTheme,
 } from "hunkdiff/extension";
-import { notesFor, noteSource, noteText, revealNote } from "./notes.ts";
+import type { NoteThread } from "./notes.ts";
+import { notesFor, noteSource, threadsFor, revealNote } from "./notes.ts";
+import { hunkLabel } from "./hunk-label.ts";
 import { toggleHideReviewedFiles } from "./hide.ts";
 import {
   fileProgress,
@@ -131,12 +133,16 @@ function FileRow({ file, selected, width, theme, onSelect }: FileRowProps) {
           style={{ fg: selected ? theme.accent : theme.text }}
         />
       </box>
-      <text
-        content={right.length > 0 ? `${right} ` : ""}
-        style={{
-          fg: done ? theme.badgeAdded : theme.muted,
-        }}
-      />
+      <box style={{ flexDirection: "row", height: 1 }}>
+        {stats && <>
+          <text content={`+${file.stats.additions}${truncated}`} style={{ fg: theme.badgeAdded }} />
+          <text content={` -${file.stats.deletions}${truncated}`} style={{ fg: theme.badgeRemoved }} />
+        </>}
+        <text
+          content={`${stats && (count || notes) ? " " : ""}${[count, notes > 0 ? `${notes}n` : ""].filter(Boolean).join(" ")} `}
+          style={{ fg: theme.muted }}
+        />
+      </box>
     </box>
   );
 }
@@ -164,7 +170,7 @@ function HunkRow({
   // Leading indent + checkbox + ordinal ("   ☐ 12. ").
   const prefix = `   ${check} ${ordinal} `;
   const labelMax = Math.max(1, width - prefix.length - 1);
-  const label = truncateMiddle(hunk.header, labelMax);
+  const label = truncateMiddle(hunkLabel(hunk.header), labelMax);
   return (
     <box
       id={`row-${file.id}:h${hunk.index}`}
@@ -185,6 +191,23 @@ function HunkRow({
         style={{
           fg: selected ? theme.accent : reviewed ? theme.muted : theme.text,
         }}
+      />
+    </box>
+  );
+}
+
+function ThreadRow({ file, thread, ordinal, props }: {
+  file: ExtensionDiffFile;
+  thread: NoteThread;
+  ordinal: number;
+  props: ExtensionPaneProps;
+}) {
+  const label = `     ● ${ordinal}. ${thread.count} ${thread.count === 1 ? "note" : "notes"} · ${noteSource(thread.latest)}`;
+  return (
+    <box style={{ height: 1, width: "100%" }} onMouseUp={() => revealNote(file, thread.root, props.actions)}>
+      <text
+        content={truncateMiddle(label, props.width - 1)}
+        style={{ fg: thread.latest.source === "user" ? props.theme.accent : props.theme.muted }}
       />
     </box>
   );
@@ -216,6 +239,10 @@ export function ReviewedFilesPane(props: ExtensionPaneProps) {
   const rows: ReactNode[] = [];
   let lastDir: string | null = null;
   for (const file of props.files) {
+    const threads = threadsFor(file);
+    const threadRow = (thread: NoteThread, ordinal: number) => (
+      <ThreadRow key={thread.id} file={file} thread={thread} ordinal={ordinal} props={props} />
+    );
     const dir = splitPath(file.path).dir;
     if (dir !== lastDir) {
       lastDir = dir;
@@ -245,35 +272,19 @@ export function ReviewedFilesPane(props: ExtensionPaneProps) {
           onSelect={() => props.actions.selectFile(file.id)}
         />
         {showChanges && hunksFor(file).map((hunk) => (
-          <HunkRow
-            key={hunk.index}
-            file={file}
-            hunk={hunk}
-            selected={
-              file.id === props.selectedFileId &&
-              hunk.index === props.selectedHunkIndex
-            }
-            width={props.width}
-            theme={props.theme}
-            onSelect={() => props.actions.selectHunk(file.id, hunk.index)}
-          />
-        ))}
-        {showNotes && file.agent?.summary && (
-          <text content={`   ${file.agent.summary}`} style={{ fg: props.theme.muted, width: "100%" }} />
-        )}
-        {showNotes && notesFor(file).map((note, index) => (
-          <box
-            key={`${file.path}:note:${note.id ?? index}`}
-            style={{ width: "100%", flexDirection: "column", paddingLeft: 3, paddingRight: 1 }}
-            onMouseUp={() => revealNote(file, note, props.actions)}
-          >
-            <text
-              content={`● ${noteSource(note)}${note.newRange ? ` +${note.newRange[0]}` : note.oldRange ? ` -${note.oldRange[0]}` : ""}`}
-              style={{ fg: note.source === "user" ? props.theme.accent : props.theme.muted }}
+          <box key={hunk.index} style={{ flexDirection: "column", width: "100%" }}>
+            <HunkRow
+              file={file}
+              hunk={hunk}
+              selected={file.id === props.selectedFileId && hunk.index === props.selectedHunkIndex}
+              width={props.width}
+              theme={props.theme}
+              onSelect={() => props.actions.selectHunk(file.id, hunk.index)}
             />
-            <text content={noteText(note)} style={{ fg: props.theme.text, width: "100%" }} />
+            {showNotes && threads.filter(thread => thread.hunkIndex === hunk.index).map((thread, index) => threadRow(thread, index + 1))}
           </box>
         ))}
+        {showNotes && threads.filter(thread => !showChanges || thread.hunkIndex === null).map((thread, index) => threadRow(thread, index + 1))}
       </box>,
     );
   }
