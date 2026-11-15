@@ -1,7 +1,12 @@
 # Hunk review sidebar
 
-A local fork of `evantravers/hunk-mark-as-reviewed` v0.2.0 for Hunk 0.24.1.
-One pane shows files, changes, saved notes, and review progress together.
+One pane shows files, changes, saved notes, and review progress together in [Hunk](https://www.hunk.dev/).
+Requires Hunk 0.24.1 or later (extension API 32).
+
+This is a fork of **[hunk-mark-as-reviewed](https://github.com/evantravers/hunk-mark-as-reviewed)** by **[Evan Travers](https://github.com/evantravers)**, based on v0.2.0.
+The original extension provides the marking, dimming, hiding, and unreviewed-navigation features this project builds on.
+This fork adds a combined files-and-notes pane, compact thread summaries, and colored change metadata.
+This fork is maintained separately from the original extension.
 
 ## Use
 
@@ -27,13 +32,23 @@ Clearing marks and refreshing preserve the pane's open preference.
 Section preferences survive closing and reopening the pane during the session.
 The built-in pane remains available as Hunk's rendering fallback.
 
-## Installation on this machine
+## Install
 
-The user configuration loads this checkout's `mark-as-reviewed.tsx`.
-The original managed installation is retained outside the extension discovery directory as a backup.
-Do not install both versions: they use the same `mark-as-reviewed` extension id and marking keys.
+```sh
+hunk extension install siargenius/hunk-review-sidebar
+```
 
-To load this checkout for one run in a separate configuration:
+If you already use the original extension, remove it before installing this fork:
+
+```sh
+hunk extension remove hunk-mark-as-reviewed
+hunk extension install siargenius/hunk-review-sidebar
+```
+
+Both versions use the same `mark-as-reviewed` extension id, configuration table, and marking keys.
+Restart Hunk after installation. Existing sessions keep their loaded extension code.
+
+To try a checkout for one run:
 
 ```sh
 hunk diff --extension /path/to/hunk-review-sidebar/mark-as-reviewed.tsx
@@ -44,11 +59,10 @@ hunk diff --extension /path/to/hunk-review-sidebar/mark-as-reviewed.tsx
 The list follows Hunk's visible files and their annotations.
 Files hidden by filters stay hidden, including their notes.
 Drafts and orphaned notes without a visible file do not appear in this list.
-The pane renders note text. Rich markup remains available in Hunk's main review stream.
+The pane shows thread metadata. Note text and rich markup remain in Hunk's main review stream.
 Hunk retains note editing and deletion in the main review stream.
 
 Reviewed marks last for the session. Soft reloads preserve marks whose upstream identity still matches.
-The original progress bridge remains in place for existing consumers.
 The existing `[extension.mark-as-reviewed]` settings and command ids still apply.
 
 ## Development
@@ -68,11 +82,22 @@ Some npm configurations skip dependency install scripts. On macOS, make node-pty
 See [IMPLEMENTATION.md](IMPLEMENTATION.md) for the implementation plan.
 Upstream design notes remain in SPEC.md and UPSTREAM-ISSUE.md.
 
-## Local backup and rollback
+## Optional progress export
 
-`LOCAL-INSTALL.json` records this machine's backup directory and active configuration.
-The backup contains the previous config, managed extension, and installation records.
-To roll back, restore `config.toml`, copy the backup extension into Hunk's managed install directory,
-and restore its entry in `records.json`. Reopen Hunk afterward.
+The progress bridge writes a local JSON summary for tools that consume review status.
+It is disabled by default. To enable it, add this to your Hunk configuration:
+
+```toml
+[extension.mark-as-reviewed]
+progressBridge = true
+```
+
+The bridge writes to `~/.cache/hunk/review-progress/<pid>.json` and removes the file on normal shutdown.
+It does not send data over the network.
+
+## Credits
+
+Original extension: [Evan Travers's hunk-mark-as-reviewed](https://github.com/evantravers/hunk-mark-as-reviewed).
+The upstream package declares the MIT license. This fork retains that license declaration and upstream Git history.
 
 Use `HUNK_SMOKE_INSTALLED=1 npm run test:integration` to test discovery through the active user configuration.

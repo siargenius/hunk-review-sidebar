@@ -5,7 +5,10 @@
   "license": "MIT",
   "type": "module",
   "hunk": {
-    "apiVersion": 32
+    "apiVersion": 32,
+    "extensions": [
+      "./mark-as-reviewed.tsx"
+    ]
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
@@ -22,5 +25,10 @@
     "node-pty": "1.1.0",
     "react": "*",
     "typescript": "*"
-  }
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/siargenius/hunk-review-sidebar.git"
+  },
+  "homepage": "https://github.com/siargenius/hunk-review-sidebar#readme"
 }

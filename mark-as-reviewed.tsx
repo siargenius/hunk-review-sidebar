@@ -145,6 +145,6 @@ export default function (hunk: HunkExtensionAPI) {
       return reviewedHunkMarks(file, reviewed, tone);
     },
   });
-  installReviewBridge(hunk, store);
+  if (hunk.config.progressBridge === true) installReviewBridge(hunk, store);
 
 }
