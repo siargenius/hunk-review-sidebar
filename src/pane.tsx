@@ -104,8 +104,8 @@ function FileRow({ file, selected, width, theme, onSelect }: FileRowProps) {
       ? `(${progress.reviewed}/${progress.total})`
       : "";
   const notes = notesFor(file).length;
-  const noteCount = notes > 0 ? `*${notes}` : "";
-  const right = [count, noteCount, additions, deletions].filter(Boolean).join(" ");
+  const noteIndicator = notes > 0 ? "●" : "";
+  const right = [count, noteIndicator, additions, deletions].filter(Boolean).join(" ");
   // Left fixed cells: " ☐ M " — checkbox and status letter.
   const nameMax = Math.max(1, width - right.length - 6);
   const name = truncateMiddle(splitPath(file.path).base, nameMax);
@@ -135,7 +135,7 @@ function FileRow({ file, selected, width, theme, onSelect }: FileRowProps) {
       <box style={{ flexDirection: "row", height: 1 }}>
         {[
           { text: count, color: theme.muted },
-          { text: noteCount, color: theme.muted },
+          { text: noteIndicator, color: theme.muted },
           { text: additions, color: theme.badgeAdded },
           { text: deletions, color: theme.badgeRemoved },
         ].filter(item => item.text).map((item, index) => (
