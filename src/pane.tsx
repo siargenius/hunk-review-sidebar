@@ -104,7 +104,7 @@ function FileRow({ file, selected, width, theme, onSelect }: FileRowProps) {
       ? `(${progress.reviewed}/${progress.total})`
       : "";
   const notes = notesFor(file).length;
-  const noteIndicator = notes > 0 ? "●" : "";
+  const noteIndicator = notes > 0 ? `*${notes}` : "";
   const right = [noteIndicator, additions, deletions, count].filter(Boolean).join(" ");
   // Left fixed cells: " ☐ M " — checkbox and status letter.
   const nameMax = Math.max(1, width - right.length - 6);
@@ -199,13 +199,12 @@ function HunkRow({
   );
 }
 
-function ThreadRow({ file, thread, ordinal, props }: {
+function ThreadRow({ file, thread, props }: {
   file: ExtensionDiffFile;
   thread: NoteThread;
-  ordinal: number;
   props: ExtensionPaneProps;
 }) {
-  const label = `     ● ${ordinal}. ${thread.count} ${thread.count === 1 ? "note" : "notes"} · ${noteSource(thread.latest)}`;
+  const label = `     ● ${thread.count} ${thread.count === 1 ? "note" : "notes"} · ${noteSource(thread.latest)}`;
   return (
     <box style={{ height: 1, width: "100%" }} onMouseUp={() => revealNote(file, thread.root, props.actions)}>
       <text
@@ -243,8 +242,8 @@ export function ReviewedFilesPane(props: ExtensionPaneProps) {
   let lastDir: string | null = null;
   for (const file of props.files) {
     const threads = threadsFor(file);
-    const threadRow = (thread: NoteThread, ordinal: number) => (
-      <ThreadRow key={thread.id} file={file} thread={thread} ordinal={ordinal} props={props} />
+    const threadRow = (thread: NoteThread) => (
+      <ThreadRow key={thread.id} file={file} thread={thread} props={props} />
     );
     const dir = splitPath(file.path).dir;
     if (dir !== lastDir) {
@@ -284,10 +283,10 @@ export function ReviewedFilesPane(props: ExtensionPaneProps) {
               theme={props.theme}
               onSelect={() => props.actions.selectHunk(file.id, hunk.index)}
             />
-            {showNotes && threads.filter(thread => thread.hunkIndex === hunk.index).map((thread, index) => threadRow(thread, index + 1))}
+            {showNotes && threads.filter(thread => thread.hunkIndex === hunk.index).map(threadRow)}
           </box>
         ))}
-        {showNotes && threads.filter(thread => !showChanges || thread.hunkIndex === null).map((thread, index) => threadRow(thread, index + 1))}
+        {showNotes && threads.filter(thread => !showChanges || thread.hunkIndex === null).map(threadRow)}
       </box>,
     );
   }
